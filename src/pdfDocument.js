@@ -105,6 +105,38 @@ function formatBytes(size) {
   return `${(size / (1024 * 1024)).toFixed(1)}MB`;
 }
 
+function syntheticGroups(pageInfo, findings) {
+  const indexes = new Map(pageInfo.items.map((entry, index) => [entry, index]));
+  const groups = new Map();
+  for (const finding of findings) {
+    const localStart = finding.offset - pageInfo.start;
+    const overlaps = pageInfo.items.filter((entry) => entry.start < localStart + finding.length && entry.end > localStart);
+    if (!overlaps.length) continue;
+    const key = overlaps.map((entry) => indexes.get(entry)).join(",");
+    const group = groups.get(key) || { entries: overlaps, findings: [] };
+    group.findings.push(finding);
+    groups.set(key, group);
+  }
+  return groups.values();
+}
+
+function syntheticRange(finding, entries) {
+  let cursor = 0;
+  let start = null;
+  let end = null;
+  const findingEnd = finding.offset + finding.length;
+  for (const entry of entries) {
+    const overlapStart = Math.max(finding.offset, entry.start);
+    const overlapEnd = Math.min(findingEnd, entry.end);
+    if (overlapEnd > overlapStart) {
+      start ??= cursor + overlapStart - entry.start;
+      end = cursor + overlapEnd - entry.start;
+    }
+    cursor += entry.end - entry.start;
+  }
+  return start === null || end === null ? null : { start, end };
+}
+
 export async function rasterizePdf(pdfDocument, registry, maskMode = "blackout") {
   await loadEngines();
   if (typeof globalThis.document?.createElement !== "function") throw new Error("PDF rasterization requires a browser canvas.");
@@ -118,27 +150,44 @@ export async function rasterizePdf(pdfDocument, registry, maskMode = "blackout")
     context.fillStyle = "#ffffff";
     context.fillRect(0, 0, canvas.width, canvas.height);
     await pageInfo.page.render({ canvasContext: context, viewport }).promise;
-    for (const finding of registry.active().filter((item) => item.page === pageInfo.pageNumber)) {
-      const box = finding.boundingBox;
-      if (!box) continue;
-      const x = box.x * 1.5;
-      const y = box.y * 1.5;
-      const width = box.width * 1.5;
-      const height = box.height * 1.5;
-      context.fillStyle = maskMode === "blackout" ? "#111816" : "#ffffff";
-      context.fillRect(x, y, width, height);
-      if (maskMode === "synthetic_replacement") {
-        const replacement = syntheticReplacement(finding.type, finding.value);
+    const active = registry.active().filter((item) => item.page === pageInfo.pageNumber);
+    if (maskMode === "blackout") {
+      for (const finding of active) {
+        const box = finding.boundingBox;
+        if (!box) continue;
+        context.fillStyle = "#111816";
+        context.fillRect(box.x * 1.5, box.y * 1.5, box.width * 1.5, box.height * 1.5);
+      }
+    } else {
+      for (const group of syntheticGroups(pageInfo, active)) {
+        const entries = [...group.entries].sort((left, right) => left.start - right.start);
+        const redacted = group.findings.filter((finding) => finding.status === "redacted");
+        if (!redacted.length) continue;
+        let text = entries.map((entry) => entry.item.str).join("");
+        for (const finding of redacted.sort((left, right) => right.offset - left.offset)) {
+          const range = syntheticRange(finding, entries);
+          if (!range) continue;
+          text = `${text.slice(0, range.start)}${syntheticReplacement(finding.type, finding.value)}${text.slice(range.end)}`;
+        }
+        const boxes = entries.map(({ item }) => itemBox(item, pageInfo.height));
+        const x = Math.min(...boxes.map((box) => box.x)) * 1.5;
+        const y = Math.min(...boxes.map((box) => box.y)) * 1.5;
+        const right = Math.max(...boxes.map((box) => box.x + box.width)) * 1.5;
+        const bottom = Math.max(...boxes.map((box) => box.y + box.height)) * 1.5;
+        const width = right - x;
+        const height = bottom - y;
+        context.fillStyle = "#ffffff";
+        context.fillRect(x, y, width, height);
         let fontSize = Math.max(10, height * 0.65);
         const availableWidth = Math.max(0, width - 4);
         context.font = `${fontSize}px sans-serif`;
-        while (fontSize > 7 && context.measureText(replacement).width > availableWidth) {
+        while (fontSize > 7 && context.measureText(text).width > availableWidth) {
           fontSize -= 1;
           context.font = `${fontSize}px sans-serif`;
         }
-        if (context.measureText(replacement).width <= availableWidth) {
+        if (context.measureText(text).width <= availableWidth) {
           context.fillStyle = "#111816";
-          context.fillText(replacement, x + 2, y + height * 0.75);
+          context.fillText(text, x + 2, y + height * 0.75);
         } else {
           context.fillStyle = "#111816";
           context.fillRect(x, y, width, height);

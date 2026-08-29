@@ -209,6 +209,22 @@ test("certificate metadata contains no original values and is available through 
   assert.deepEqual(exposed.certificate, certificate);
 });
 
+test("digest-less passing verification has no certificate and blocks certificate retrieval", async () => {
+  const registry = createFindingRegistry();
+  const document = await loadTextDocument("SSN 123-45-6789");
+  const state = { artifact: null, verification: null, revision: 0, maskMode: "blackout" };
+  const context = { document, registry, state, onVerificationChanged() {}, onStateChanged() {} };
+  await scanDocumentPII(context);
+  await applyRedactions(context, { targetIds: registry.all().map((finding) => finding.id) });
+  state.artifact = { ...state.artifact, digest: "" };
+  const result = await verifyRedaction(context);
+  assert.equal(result.passed, true);
+  assert.equal(result.certificate, null);
+  const certificate = await getVerificationCertificate(context);
+  assert.equal(certificate.status, "blocked");
+  assert.match(certificate.message, /digest is unavailable/i);
+});
+
 test("blackout mode still reports no synthetic placeholders", async () => {
   const registry = createFindingRegistry();
   const document = await loadTextDocument("SSN 123-45-6789");

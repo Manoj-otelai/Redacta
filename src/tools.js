@@ -119,7 +119,7 @@ export async function verifyRedaction(context, { categories } = {}) {
   result.passed = result.remainingFindings === 0 && result.originalValuesFound === 0;
   result.status = result.passed ? "verified" : "failed";
   result.artifactDigest = context.state.artifact.digest;
-  if (result.passed) {
+  if (result.passed && result.artifactDigest) {
     const groups = context.state.artifact.digest.slice(0, 12).toUpperCase().match(/.{4}/g).join("-");
     result.certificate = {
       certificateId: `RDCT-${groups}`,
@@ -148,6 +148,9 @@ export async function verifyRedaction(context, { categories } = {}) {
 export async function getVerificationCertificate(context) {
   const verification = context.state.verification;
   const artifact = context.state.artifact;
+  if (verification?.passed && !verification.artifactDigest) {
+    return { status: "blocked", message: "A verification digest is unavailable in this context." };
+  }
   if (!verification?.passed || !verification.certificate || !artifact?.blob) {
     return { status: "blocked", message: "A verified artifact is required before retrieving its certificate." };
   }
