@@ -8,127 +8,172 @@
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
-    <div class="ambient ambient-one"></div>
-    <div class="ambient ambient-two"></div>
-    <header class="topbar">
-      <a class="brand" href="./"><span class="brand-mark">⌁</span> PrivacyVault</a>
-      <div class="topbar-right">
-        <span class="native-status" id="nativeStatus"><span class="status-dot"></span> WebMCP ready</span>
-        <span class="local-pill">● Local only</span>
-      </div>
-    </header>
-
-    <main class="shell">
-      <section class="hero">
-        <div>
-          <p class="eyebrow">THE WEBMCP-NATIVE PRIVACY BOUNDARY</p>
-          <h1>Let agents operate.<br /><em>Keep your data.</em></h1>
-          <p class="hero-copy">Scan, redact, verify, and export sensitive documents without exposing their contents to an AI agent.</p>
+    <div class="app">
+      <header class="app-bar">
+        <a class="brand" href="./"><span class="brand-mark">PV</span><span class="brand-name">PrivacyVault</span></a>
+        <nav class="menu-bar" aria-label="Application menus">
+          <button class="menu-item" id="menuOpen" type="button">File</button>
+          <button class="menu-item" id="menuDemoText" type="button">Demo TXT</button>
+          <button class="menu-item" id="menuDemoPdf" type="button">Demo PDF</button>
+        </nav>
+        <div class="doc-chip">
+          <svg class="doc-chip-icon" viewBox="0 0 20 20" aria-hidden="true"><path d="M5 2h6l4 4v12H5z" /><path d="M11 2v4h4" /></svg>
+          <span class="doc-chip-text"><strong id="fileName">No document open</strong><small id="fileMeta">Drop a PDF, TXT, JSON or CSV file to begin</small></span>
         </div>
-        <div class="hero-proof">
-          <span class="proof-label">AGENT KNOWS</span>
-          <strong>17 findings</strong>
-          <span class="proof-label">AGENT NEVER SEES</span>
-          <strong class="coral">123-45-6789</strong>
+        <div class="app-bar-right">
+          <span class="native-status" id="nativeStatus"><span class="status-dot"></span> WebMCP ready</span>
+          <span class="local-pill"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M6 9V7a4 4 0 0 1 8 0v2" /><rect x="4.5" y="9" width="11" height="8" rx="1.5" /></svg> Local only</span>
         </div>
-      </section>
+      </header>
 
-      <section class="workspace">
-        <div class="main-column">
-          <div class="upload-card" id="dropZone">
-            <div class="upload-icon">↑</div>
-            <div>
-              <h2>Drop a document to begin</h2>
-              <p>PDF · TXT · JSON · CSV <span>— processed entirely in your browser</span></p>
-            </div>
-            <button class="button button-light" id="browseButton">Browse files</button>
-            <input type="file" id="fileInput" accept=".pdf,.txt,.json,.csv,application/pdf,text/plain,application/json,text/csv" hidden />
-          </div>
+      <div class="app-body">
+        <nav class="tool-rail" id="toolRail" aria-label="Tools">
+          <button class="rail-button is-active" type="button" data-pane="redact" title="Redact tools">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h16" /><rect x="6" y="9" width="12" height="6" rx="1" /><path d="M9 9V5h6v4" /></svg>
+            <span>Redact</span>
+          </button>
+          <button class="rail-button" type="button" data-pane="agent" title="Agent activity">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="7" width="16" height="12" rx="2" /><path d="M9 12h.01M15 12h.01M10 16h4M12 4v3" /></svg>
+            <span>Agent</span>
+          </button>
+          <button class="rail-button" type="button" data-pane="privacy" title="Privacy boundary">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l7 3v6c0 4-3 7-7 9-4-2-7-5-7-9V6z" /><path d="M9 12l2 2 4-4" /></svg>
+            <span>Privacy</span>
+          </button>
+          <div class="rail-spacer"></div>
+          <button class="rail-button" type="button" data-pane="developer" title="Developer panel">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 8l-4 4 4 4M15 8l4 4-4 4" /></svg>
+            <span>Console</span>
+          </button>
+        </nav>
 
-          <div class="document-card">
-            <div class="card-heading">
-              <div class="file-heading">
-                <span class="file-icon">▤</span>
-                <div><h2 id="fileName">confidential-employment-contract.txt</h2><p id="fileMeta">DEMO DOCUMENT · 6.4 KB · 4 PAGES</p></div>
-              </div>
-              <span class="ready-badge" id="processingBadge">READY</span>
-            </div>
-            <div class="document-body" id="documentPreview">
-              <div class="document-topline"><span>CONFIDENTIAL</span><span>EMPLOYMENT AGREEMENT / 2026</span></div>
-              <h3>Employment Agreement</h3>
-              <p>This Agreement is entered into by and between <mark data-finding="name">Jordan Lee</mark> (“Employee”) and Northstar Labs.</p>
-              <p>Employee identification: <mark data-finding="ssn">123-45-6789</mark><br />Contact: <mark data-finding="email">jordan.lee@northstar.example</mark> · <mark data-finding="phone">(415) 555-0198</mark></p>
-              <p>Payroll will be deposited to card ending <mark data-finding="credit_card">4111 1111 1111 1111</mark>. Internal integration token: <mark data-finding="api_key">sk_live_51NORTHSTAR_8df7a</mark>.</p>
-              <p class="document-muted">The parties agree to the terms and conditions set forth below. This document is synthetic data for demonstration purposes.</p>
-              <div class="document-footer"><span>NORTHSTAR LABS · PRIVATE</span><span>PAGE 1 / 4</span></div>
-            </div>
-            <div class="document-actions">
-              <button class="button button-primary" id="scanButton">Scan for sensitive data <span>→</span></button>
-              <button class="button button-ghost" id="loadDemoButton">Load demo TXT</button>
-              <button class="button button-ghost" id="loadDemoPdfButton">Load demo PDF</button>
-            </div>
-          </div>
-        </div>
-
-        <aside class="inspector">
-          <div class="privacy-card">
-            <div class="privacy-title"><span class="lock">◆</span><span>PRIVACY BOUNDARY</span><span class="shield">✓</span></div>
-            <div class="privacy-row"><span>Original file</span><strong>LOCAL</strong></div>
-            <div class="privacy-row"><span>Outbound requests</span><strong id="networkUploads">0</strong></div>
-            <div class="verification-message" id="verificationMessage" role="alert"></div>
-            <div class="privacy-divider"></div>
-            <p class="tiny-label">AGENT CAN SEE</p>
-            <ul class="safe-list"><li>Finding counts</li><li>Categories & locations</li><li>Verification status</li></ul>
-            <p class="tiny-label">AGENT CANNOT SEE</p>
-            <ul class="locked-list"><li>Document contents</li><li>PII values & secrets</li></ul>
-          </div>
-
-          <div class="findings-card">
-            <div class="card-heading compact"><h2>Privacy inspector</h2><span id="findingTotal">0 found</span></div>
-            <div class="finding-list" id="findingList"><div class="empty-state">Run a local scan to see<br />privacy-safe findings.</div></div>
-            <div class="inspector-actions">
-              <button class="button button-primary full" id="redactButton" disabled>Redact selected <span>→</span></button>
-              <button class="button button-ghost full" id="manualButton">Manual redaction</button>
-              <button class="button button-ghost full" id="undoButton" disabled>Undo last redaction</button>
-              <button class="button button-ghost full" id="verifyButton" disabled>Verify sanitized copy</button>
-              <button class="button button-ghost full" id="exportButton" disabled>Export verified copy</button>
-            </div>
-          </div>
+        <aside class="thumb-pane" aria-label="Page thumbnails">
+          <div class="pane-head">Pages</div>
+          <div class="thumb-list" id="thumbList"><p class="thumb-empty">No pages yet</p></div>
         </aside>
-      </section>
 
-      <section class="activity-section">
-        <div class="section-label"><span class="live-dot"></span> AGENT ACTIVITY <span class="mono" id="modeLabel">DEMO MODE</span></div>
-        <div class="activity-grid" id="activityLog">
-          <div class="activity-item muted"><span class="activity-check">○</span><div><strong>Waiting for agent</strong><p>WebMCP tools are ready to be called</p></div></div>
-        </div>
-      </section>
+        <main class="viewer">
+          <div class="viewer-toolbar">
+            <div class="tool-group">
+              <button class="icon-button" id="pagePrev" type="button" title="Previous page" disabled><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M12 5l-5 5 5 5" /></svg></button>
+              <input class="page-input" id="pageInput" type="text" value="1" size="2" aria-label="Page number" />
+              <span class="tool-text">of <span id="pageCount">1</span></span>
+              <button class="icon-button" id="pageNext" type="button" title="Next page" disabled><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M8 5l5 5-5 5" /></svg></button>
+            </div>
+            <div class="tool-divider"></div>
+            <div class="tool-group">
+              <button class="icon-button" id="zoomOut" type="button" title="Zoom out"><svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="9" cy="9" r="5" /><path d="M13 13l4 4M7 9h4" /></svg></button>
+              <span class="tool-text" id="zoomLabel">100%</span>
+              <button class="icon-button" id="zoomIn" type="button" title="Zoom in"><svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="9" cy="9" r="5" /><path d="M13 13l4 4M7 9h4M9 7v4" /></svg></button>
+            </div>
+            <div class="tool-divider"></div>
+            <div class="tool-group">
+              <button class="icon-button toggle" id="manualButton" type="button" title="Manual redaction — drag on the page or select text"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 16l3-1 8-8-2-2-8 8z" /><path d="M13 4l3 3" /></svg><span class="icon-button-text">Mark manually</span></button>
+            </div>
+            <div class="toolbar-spacer"></div>
+            <span class="ready-badge" id="processingBadge">READY</span>
+          </div>
 
-      <section class="developer-panel">
-        <button class="button button-ghost" id="developerToggle">Developer panel</button>
-        <div id="developerPanel" hidden>
-          <label for="developerTool">Tool</label>
-          <select id="developerTool"></select>
-          <label for="developerArgs">JSON arguments</label>
-          <textarea id="developerArgs">{}</textarea>
-          <button class="button button-primary" id="developerRun">Invoke tool</button>
-          <pre id="developerResult" aria-live="polite"></pre>
-        </div>
-      </section>
+          <div class="viewer-stage">
+            <div class="page-surface" id="documentPreview" aria-label="Document preview"></div>
+            <div class="viewer-empty" id="dropZone">
+              <svg class="viewer-empty-icon" viewBox="0 0 48 48" aria-hidden="true"><path d="M12 6h16l8 8v28H12z" /><path d="M28 6v8h8" /><path d="M24 34V22m0 0l-4 4m4-4l4 4" /></svg>
+              <h2>Open a document</h2>
+              <p>Drag a file here, or open one from your machine. Nothing leaves your browser.</p>
+              <div class="viewer-empty-actions">
+                <button class="button button-primary" id="browseButton" type="button">Open file</button>
+                <button class="button button-secondary" id="loadDemoPdfButton" type="button">Load demo PDF</button>
+                <button class="button button-quiet" id="loadDemoButton" type="button">Load demo TXT</button>
+              </div>
+              <p class="viewer-empty-formats">PDF · TXT · JSON · CSV</p>
+              <input type="file" id="fileInput" accept=".pdf,.txt,.json,.csv,application/pdf,text/plain,application/json,text/csv" hidden />
+            </div>
+          </div>
+        </main>
 
-      <section class="bottom-proof">
-        <div><span class="big-stat" id="bottomUploadCount">0</span><span>outbound requests<br /><small>MEASURED NETWORK REQUESTS</small></span></div>
-        <div><span class="big-stat">100%</span><span>local processing<br /><small>YOUR BROWSER</small></span></div>
-        <div><span class="big-stat" id="verifiedStat">—</span><span>verified export<br /><small>NOT UNTIL PROVEN</small></span></div>
-        <div class="quote">“The agent knows there are seven SSNs.<br /><em>It never knows what they are.</em>”</div>
-      </section>
-    </main>
+        <aside class="task-pane" aria-label="Task pane">
+          <section class="task-panel is-active" id="panel-redact">
+            <header class="task-head">
+              <h2>Redact</h2>
+              <span class="task-count" id="findingTotal">0 found</span>
+            </header>
+            <div class="task-scroll">
+              <p class="task-hint">Findings are detected locally. The agent receives categories, locations and confidence — never the values.</p>
+              <div class="finding-list" id="findingList"><div class="empty-state">Run a local scan to see privacy-safe findings.</div></div>
+            </div>
+            <div class="task-actions">
+              <button class="button button-primary full" id="scanButton" type="button">Scan for sensitive data</button>
+              <button class="button button-danger full" id="redactButton" type="button" disabled>Apply redactions</button>
+              <div class="button-row">
+                <button class="button button-secondary" id="verifyButton" type="button" disabled>Verify</button>
+                <button class="button button-secondary" id="exportButton" type="button" disabled>Export</button>
+              </div>
+              <button class="button button-quiet full" id="undoButton" type="button" disabled>Undo last redaction</button>
+              <div class="verification-message" id="verificationMessage" role="alert"></div>
+            </div>
+          </section>
+
+          <section class="task-panel" id="panel-agent">
+            <header class="task-head">
+              <h2>Agent activity</h2>
+              <span class="task-count mono" id="modeLabel">DEMO MODE</span>
+            </header>
+            <div class="task-scroll">
+              <p class="task-hint">Every WebMCP tool call is logged with privacy-safe argument and result summaries.</p>
+              <div class="activity-log" id="activityLog">
+                <div class="activity-item muted"><span class="activity-check">○</span><div><strong>Waiting for agent</strong><p>WebMCP tools are registered and ready to be called</p></div></div>
+              </div>
+            </div>
+          </section>
+
+          <section class="task-panel" id="panel-privacy">
+            <header class="task-head"><h2>Privacy boundary</h2><span class="task-count ok" id="verifiedStat">—</span></header>
+            <div class="task-scroll">
+              <div class="privacy-grid">
+                <div class="privacy-row"><span>Original file</span><strong>LOCAL</strong></div>
+                <div class="privacy-row"><span>Outbound requests</span><strong id="networkUploads">0</strong></div>
+                <div class="privacy-row"><span>Processing</span><strong>100% IN BROWSER</strong></div>
+              </div>
+              <p class="tiny-label">Agent can see</p>
+              <ul class="safe-list"><li>Finding counts</li><li>Categories &amp; locations</li><li>Confidence scores</li><li>Verification status</li></ul>
+              <p class="tiny-label">Agent cannot see</p>
+              <ul class="locked-list"><li>Document contents</li><li>PII values &amp; secrets</li><li>Artifact bytes</li></ul>
+              <blockquote class="pitch">“The agent knows there are seven SSNs.<br /><em>It never knows what they are.</em>”</blockquote>
+            </div>
+          </section>
+
+          <section class="task-panel" id="panel-developer">
+            <header class="task-head"><h2>Tool console</h2><span class="task-count mono">WEBMCP</span></header>
+            <div class="task-scroll">
+              <p class="task-hint">Invoke any registered tool exactly as an agent would.</p>
+              <label class="field-label" for="developerTool">Tool</label>
+              <select id="developerTool"></select>
+              <label class="field-label" for="developerArgs">JSON arguments</label>
+              <textarea id="developerArgs">{}</textarea>
+              <button class="button button-primary full" id="developerRun" type="button">Invoke tool</button>
+              <pre id="developerResult" aria-live="polite"></pre>
+            </div>
+          </section>
+        </aside>
+      </div>
+
+      <footer class="status-bar">
+        <span class="status-cell"><span class="status-dot ok"></span> Document stays local</span>
+        <span class="status-cell">Outbound requests <strong id="bottomUploadCount">0</strong></span>
+        <span class="status-cell">Findings <strong id="statusFindings">0</strong></span>
+        <span class="status-cell">Export <strong id="statusExport">blocked</strong></span>
+        <span class="status-spacer"></span>
+        <span class="status-cell muted">The WebMCP-native privacy boundary for AI agents</span>
+      </footer>
+    </div>
+
     <div class="toast" id="toast" role="status"></div>
     <div class="permission-modal" id="permissionModal" hidden>
       <div class="permission-dialog" role="dialog" aria-modal="true" aria-labelledby="permissionTitle">
+        <div class="permission-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="7" width="16" height="12" rx="2" /><path d="M9 12h.01M15 12h.01M10 16h4M12 4v3" /></svg></div>
         <h2 id="permissionTitle">Agent request</h2>
         <p id="permissionMessage"></p>
-        <div><button class="button button-primary" id="permissionAllow">Allow</button><button class="button button-ghost" id="permissionCancel">Cancel</button></div>
+        <div class="permission-actions"><button class="button button-quiet" id="permissionCancel" type="button">Cancel</button><button class="button button-primary" id="permissionAllow" type="button">Allow</button></div>
       </div>
     </div>
     <script type="module" src="src/app.js"></script>

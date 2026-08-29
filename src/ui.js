@@ -24,12 +24,27 @@ Internal integration token: sk_live_51NORTHSTAR_8df7a.
 The parties agree to the terms and conditions set forth below.`;
 
 const toolMap = { inspectDocument, scanDocumentPII, applyRedactions, verifyRedaction, getFindingDetails, exportSanitizedDocument };
-const state = { document: null, artifact: null, verification: null, maskMode: "blackout", revision: 0, lastRedactionBatch: [], manualMode: false, pdfPage: 1 };
+const state = { document: null, artifact: null, verification: null, maskMode: "blackout", revision: 0, lastRedactionBatch: [], manualMode: false, pdfPage: 1, zoom: 1 };
 const registry = createFindingRegistry();
 const $ = (id) => document.getElementById(id);
+const ZOOM_STEPS = [0.5, 0.67, 0.8, 1, 1.25, 1.5, 2];
+const TYPE_LABELS = {
+  ssn: "SSN",
+  credit_card: "Credit card",
+  email: "Email address",
+  phone: "Phone number",
+  api_key: "API key",
+  private_key: "Private key",
+  bearer_token: "Bearer token",
+  db_connection_string: "Database URI",
+  manual_rectangle: "Manual region",
+  manual: "Manual selection",
+};
 let pdfPreviewCache = { key: null, pdf: null };
 let pdfRenderGeneration = 0;
-let pdfPreviewElements = null;
+let thumbGeneration = 0;
+let thumbKey = null;
+let pdfCanvas = null;
 const context = {
   state,
   registry,
@@ -81,6 +96,7 @@ function safeResult(result) {
 }
 
 function addActivity(name, args, result) {
+  $("activityLog").querySelector(".activity-item.muted")?.remove();
   const item = document.createElement("div");
   item.className = "activity-item";
   const icon = document.createElement("span");
@@ -188,73 +204,124 @@ function selectionPointToOffset(root, node, offset) {
   return 0;
 }
 
+function createPdfCanvas(preview) {
+  const canvas = document.createElement("canvas");
+  canvas.className = "pdf-preview";
+  preview.replaceChildren(canvas);
+  let start = null;
+  canvas.onpointerdown = (event) => { if (state.manualMode) start = [event.offsetX, event.offsetY]; };
+  canvas.onpointerup = (event) => {
+    if (!state.manualMode || !start) return;
+    const page = state.document.pages[state.pdfPage - 1];
+    if (!page || !canvas.clientWidth) return;
+    const scale = page.width / canvas.clientWidth;
+    const left = Math.min(start[0], event.offsetX) * scale;
+    const top = Math.min(start[1], event.offsetY) * scale;
+    const width = Math.abs(event.offsetX - start[0]) * scale;
+    const height = Math.abs(event.offsetY - start[1]) * scale;
+    start = null;
+    if (width < 1 || height < 1) return;
+    registry.addManual({ type: "manual_rectangle", page: page.pageNumber, location: `page ${page.pageNumber}, manual rectangle`, boundingBox: { x: left, y: top, width, height } });
+    setManualMode(false);
+    invalidate();
+  };
+  return canvas;
+}
+
 function renderPreview() {
   const preview = $("documentPreview");
   if (!state.document) return;
   if (state.document.kind === "pdf") {
-    if (!pdfPreviewElements) {
-      const controls = document.createElement("div");
-      controls.className = "pdf-controls";
-      const previous = document.createElement("button");
-      previous.className = "button button-ghost";
-      previous.textContent = "Previous";
-      previous.type = "button";
-      const label = document.createElement("span");
-      const next = document.createElement("button");
-      next.className = "button button-ghost";
-      next.textContent = "Next";
-      next.type = "button";
-      const canvas = document.createElement("canvas");
-      canvas.className = "pdf-preview";
-      preview.replaceChildren(controls, canvas);
-      controls.append(previous, label, next);
-      pdfPreviewElements = { canvas, previous, label, next };
-      previous.onclick = () => { state.pdfPage = Math.max(1, state.pdfPage - 1); render(); };
-      next.onclick = () => { state.pdfPage = Math.min(state.document.pageCount, state.pdfPage + 1); render(); };
-      let start = null;
-      canvas.onpointerdown = (event) => { if (state.manualMode) start = [event.offsetX, event.offsetY]; };
-      canvas.onpointerup = (event) => {
-        if (!state.manualMode || !start) return;
-        const page = state.document.pages[state.pdfPage - 1];
-        if (!page || !canvas.clientWidth) return;
-        const scale = page.width / canvas.clientWidth;
-        const left = Math.min(start[0], event.offsetX) * scale;
-        const top = Math.min(start[1], event.offsetY) * scale;
-        const width = Math.abs(event.offsetX - start[0]) * scale;
-        const height = Math.abs(event.offsetY - start[1]) * scale;
-        if (width < 1 || height < 1) return;
-        registry.addManual({ type: "manual_rectangle", page: page.pageNumber, location: `page ${page.pageNumber}, manual rectangle`, boundingBox: { x: left, y: top, width, height } });
-        state.manualMode = false;
-        invalidate();
-      };
-    }
-    state.pdfPage = Math.max(1, Math.min(state.document.pageCount, state.pdfPage));
-    pdfPreviewElements.label.textContent = `Page ${state.pdfPage} of ${state.document.pageCount}`;
-    pdfPreviewElements.previous.disabled = state.pdfPage <= 1;
-    pdfPreviewElements.next.disabled = state.pdfPage >= state.document.pageCount;
-    renderPdfPreview(pdfPreviewElements.canvas, state.pdfPage).catch(() => toast("Could not render the PDF preview."));
+    if (!pdfCanvas || !preview.contains(pdfCanvas)) pdfCanvas = createPdfCanvas(preview);
+    renderPdfPreview(pdfCanvas, state.pdfPage).catch(() => toast("Could not render the PDF preview."));
     return;
   }
-  preview.innerHTML = `<div class="document-topline"><span>CONFIDENTIAL</span><span>LOCAL DOCUMENT / PREVIEW</span></div><h3>${escapeHtml(state.document.name.replace(/\.[^.]+$/, ""))}</h3><p>${renderTextPreview()}</p><div class="document-footer"><span>PRIVACYVAULT · PRIVATE</span><span>LOCAL PREVIEW</span></div>`;
-  preview.querySelector("p")?.classList.add("text-content");
-  attachManualTextSelection(preview);
+  preview.innerHTML = `<div class="text-page"><div class="document-topline"><span>Confidential</span><span>Local document / preview</span></div><h3>${escapeHtml(state.document.name.replace(/\.[^.]+$/, ""))}</h3><p class="text-content">${renderTextPreview()}</p><div class="document-footer"><span>PrivacyVault · private</span><span>Page 1 of 1</span></div></div>`;
+  pdfCanvas = null;
+  attachManualTextSelection(preview.firstElementChild);
+}
+
+function renderViewerChrome() {
+  const pageCount = state.document?.kind === "pdf" ? state.document.pageCount : 1;
+  $("pageCount").textContent = String(state.document ? pageCount : 1);
+  $("pageInput").value = String(state.document ? state.pdfPage : 1);
+  $("pageInput").disabled = pageCount <= 1;
+  $("pagePrev").disabled = !state.document || state.pdfPage <= 1;
+  $("pageNext").disabled = !state.document || state.pdfPage >= pageCount;
+  $("zoomLabel").textContent = `${Math.round(state.zoom * 100)}%`;
+  $("zoomIn").disabled = state.zoom >= ZOOM_STEPS.at(-1);
+  $("zoomOut").disabled = state.zoom <= ZOOM_STEPS[0];
+  $("documentPreview").style.setProperty("--doc-zoom", state.zoom);
+  $("documentPreview").classList.toggle("is-marking", state.manualMode);
+  $("manualButton").classList.toggle("is-active", state.manualMode);
+  $("dropZone").hidden = Boolean(state.document);
+}
+
+function renderThumbnails() {
+  const list = $("thumbList");
+  if (!state.document) {
+    list.replaceChildren(Object.assign(document.createElement("p"), { className: "thumb-empty", textContent: "No pages yet" }));
+    thumbKey = null;
+    return;
+  }
+  const pageCount = state.document.kind === "pdf" ? state.document.pageCount : 1;
+  const key = `${state.document.name}:${state.artifact?.digest ?? "source"}:${pageCount}`;
+  if (thumbKey !== key) {
+    thumbKey = key;
+    const generation = ++thumbGeneration;
+    list.replaceChildren();
+    for (let pageNumber = 1; pageNumber <= pageCount; pageNumber += 1) {
+      const thumb = document.createElement("button");
+      thumb.type = "button";
+      thumb.className = "thumb";
+      thumb.dataset.page = String(pageNumber);
+      const label = document.createElement("span");
+      label.textContent = String(pageNumber);
+      if (state.document.kind === "pdf") {
+        const canvas = document.createElement("canvas");
+        thumb.append(canvas, label);
+        renderThumbnail(canvas, pageNumber, generation).catch(() => {});
+      } else {
+        const face = document.createElement("span");
+        face.className = "thumb-face";
+        face.textContent = "¶";
+        thumb.append(face, label);
+      }
+      list.append(thumb);
+    }
+  }
+  for (const thumb of list.querySelectorAll(".thumb")) thumb.classList.toggle("is-active", Number(thumb.dataset.page) === state.pdfPage);
+}
+
+async function renderThumbnail(canvas, pageNumber, generation) {
+  const pdf = await loadPreviewPdf();
+  if (generation !== thumbGeneration) return;
+  const page = await pdf.getPage(pageNumber);
+  const viewport = page.getViewport({ scale: 140 / (page.view[2] - page.view[0]) });
+  canvas.width = viewport.width;
+  canvas.height = viewport.height;
+  await page.render({ canvasContext: canvas.getContext("2d"), viewport }).promise;
+}
+
+async function loadPreviewPdf() {
+  const key = state.artifact?.digest ? `artifact:${state.artifact.digest}` : `source:${state.document.name}:${state.revision}`;
+  if (pdfPreviewCache.key === key) return pdfPreviewCache.pdf;
+  if (state.artifact?.blob) {
+    const { getDocument } = await import("../vendor/pdfjs/pdf.mjs");
+    const bytes = new Uint8Array(await state.artifact.blob.arrayBuffer());
+    pdfPreviewCache = { key, pdf: await getDocument({ data: bytes }).promise };
+  } else {
+    pdfPreviewCache = { key, pdf: state.document.pdf };
+  }
+  return pdfPreviewCache.pdf;
 }
 
 async function renderPdfPreview(canvas, pageNumber) {
   const generation = ++pdfRenderGeneration;
-  const key = state.artifact?.digest ? `artifact:${state.artifact.digest}` : `source:${state.document}`;
-  if (pdfPreviewCache.key !== key) {
-    if (state.artifact?.blob) {
-      const { getDocument } = await import("../vendor/pdfjs/pdf.mjs");
-      const bytes = new Uint8Array(await state.artifact.blob.arrayBuffer());
-      pdfPreviewCache = { key, pdf: await getDocument({ data: bytes }).promise };
-    } else {
-      pdfPreviewCache = { key, pdf: state.document.pdf };
-    }
-  }
-  const page = await pdfPreviewCache.pdf.getPage(pageNumber);
+  const pdf = await loadPreviewPdf();
+  const page = await pdf.getPage(pageNumber);
   const width = page.view[2] - page.view[0];
-  const viewport = page.getViewport({ scale: Math.min(1, 650 / width) });
+  const viewport = page.getViewport({ scale: Math.min(1, 720 / width) * state.zoom });
   const buffer = document.createElement("canvas");
   buffer.width = viewport.width;
   buffer.height = viewport.height;
@@ -268,11 +335,14 @@ async function renderPdfPreview(canvas, pageNumber) {
 function render() {
   const findings = registry.all();
   const verified = Boolean(state.verification?.passed);
-  $("processingBadge").textContent = verified ? "VERIFIED" : "READY";
+  $("processingBadge").textContent = verified ? "VERIFIED" : state.document ? "READY" : "NO DOCUMENT";
   $("processingBadge").classList.toggle("verified", verified);
   $("findingTotal").textContent = `${findings.length} found`;
   $("networkUploads").textContent = String(state.networkUploads || 0);
   $("bottomUploadCount").textContent = String(state.networkUploads || 0);
+  $("statusFindings").textContent = String(findings.length);
+  $("statusExport").textContent = verified ? "unlocked" : "blocked";
+  $("verifiedStat").textContent = verified ? "VERIFIED" : "—";
   $("verificationMessage").textContent = state.verification && !verified
     ? `⚠ Verification failed — ${state.verification.remainingFindings} findings remain. Export blocked.`
     : "";
@@ -287,7 +357,7 @@ function render() {
       row.className = `finding${finding.status === "redacted" ? " redacted" : ""}${finding.status === "excluded" ? " excluded" : ""}`;
       row.dataset.findingId = finding.id;
       row.dataset.page = finding.page || 1;
-      row.innerHTML = `<input type="checkbox" data-index="${index}" ${finding.status === "redacted" ? "disabled" : ""} ${finding.status === "excluded" ? "" : "checked"} /><span class="finding-dot"></span><span class="finding-info"><strong>${escapeHtml(finding.type.replaceAll("_", " "))}</strong><small>${finding.id} · ${escapeHtml(finding.location || "local")}</small></span><span class="confidence">${finding.confidence.toFixed(2)}</span><button class="finding-control" data-action="${finding.status === "excluded" ? "include" : "exclude"}" data-id="${finding.id}">${finding.status === "excluded" ? "Include" : "Exclude"}</button>${finding.status === "redacted" ? `<button class="finding-control" data-action="restore" data-id="${finding.id}">Restore</button>` : ""}`;
+      row.innerHTML = `<input type="checkbox" data-index="${index}" ${finding.status === "redacted" ? "disabled" : ""} ${finding.status === "excluded" ? "" : "checked"} /><span class="finding-dot"></span><span class="finding-info"><strong>${escapeHtml(TYPE_LABELS[finding.type] ?? finding.type.replaceAll("_", " "))}</strong><small>${finding.id} · ${escapeHtml(finding.location || "local")}</small></span><span class="confidence">${finding.confidence.toFixed(2)}</span><span class="finding-actions"><span class="finding-tag">${finding.status}</span><button class="finding-control" data-action="${finding.status === "excluded" ? "include" : "exclude"}" data-id="${finding.id}">${finding.status === "excluded" ? "Include" : "Exclude"}</button>${finding.status === "redacted" ? `<button class="finding-control" data-action="restore" data-id="${finding.id}">Restore</button>` : ""}</span>`;
       list.append(row);
     }
   }
@@ -295,7 +365,36 @@ function render() {
   $("verifyButton").disabled = !findings.some((finding) => finding.status === "redacted") && !state.artifact;
   $("exportButton").disabled = !verified;
   $("undoButton").disabled = !state.lastRedactionBatch.length;
+  renderViewerChrome();
+  renderThumbnails();
   renderPreview();
+}
+
+function setManualMode(enabled) {
+  state.manualMode = enabled;
+  renderViewerChrome();
+}
+
+function goToPage(pageNumber) {
+  const pageCount = state.document?.kind === "pdf" ? state.document.pageCount : 1;
+  state.pdfPage = Math.max(1, Math.min(pageCount, pageNumber || 1));
+  renderViewerChrome();
+  renderThumbnails();
+  renderPreview();
+}
+
+function stepZoom(direction) {
+  const index = ZOOM_STEPS.findIndex((step) => step >= state.zoom - 0.001);
+  const next = ZOOM_STEPS[Math.max(0, Math.min(ZOOM_STEPS.length - 1, (index < 0 ? ZOOM_STEPS.length - 1 : index) + direction))];
+  if (next === state.zoom) return;
+  state.zoom = next;
+  renderViewerChrome();
+  renderPreview();
+}
+
+function activatePane(name) {
+  for (const button of document.querySelectorAll(".rail-button")) button.classList.toggle("is-active", button.dataset.pane === name);
+  for (const panel of document.querySelectorAll(".task-panel")) panel.classList.toggle("is-active", panel.id === `panel-${name}`);
 }
 
 async function loadDocument(document) {
@@ -305,11 +404,13 @@ async function loadDocument(document) {
   state.verification = null;
   state.lastRedactionBatch = [];
   state.pdfPage = 1;
+  state.zoom = 1;
   pdfPreviewCache = { key: null, pdf: null };
-  pdfPreviewElements = null;
+  pdfCanvas = null;
+  thumbKey = null;
   registry.replace([]);
   $("fileName").textContent = document.name;
-  $("fileMeta").textContent = `${document.format.toUpperCase()} · ${document.sizeLabel} · LOCAL`;
+  $("fileMeta").textContent = `${document.format.toUpperCase()} · ${document.sizeLabel} · ${document.pageCount} page${document.pageCount === 1 ? "" : "s"} · local`;
   render();
   toast("Document loaded locally · no upload made");
 }
@@ -342,6 +443,7 @@ async function runRedaction() {
   if (result.status !== "success") toast(result.status === "denied" ? "Redaction cancelled." : "Redaction failed. No export was performed.");
   else {
     state.lastRedactionBatch = targetIds;
+    render();
     toast(`${result.totalRedacted} findings masked locally`);
   }
 }
@@ -366,14 +468,31 @@ function registerTools() {
 export function initUI() {
   state.networkUploads = 0;
   installNetworkMonitor((count) => { state.networkUploads = count; render(); });
-  $("browseButton").addEventListener("click", () => $("fileInput").click());
+  const openFile = () => $("fileInput").click();
+  const loadDemoText = async () => loadDocument(await loadTextDocument(new File([demoText], "confidential-employment-contract.txt", { type: "text/plain" })));
+  const loadDemoPdf = async () => loadDocument(await loadPdfDocument(await createDemoPdf()));
+  $("browseButton").addEventListener("click", openFile);
+  $("menuOpen").addEventListener("click", openFile);
   $("fileInput").addEventListener("change", (event) => handleFile(event.target.files[0]));
-  $("dropZone").addEventListener("dragover", (event) => { event.preventDefault(); $("dropZone").classList.add("dragging"); });
-  $("dropZone").addEventListener("dragleave", () => $("dropZone").classList.remove("dragging"));
-  $("dropZone").addEventListener("drop", (event) => { event.preventDefault(); $("dropZone").classList.remove("dragging"); handleFile(event.dataTransfer.files[0]); });
+  const stage = document.querySelector(".viewer-stage");
+  stage.addEventListener("dragover", (event) => { event.preventDefault(); $("dropZone").classList.add("dragging"); });
+  stage.addEventListener("dragleave", () => $("dropZone").classList.remove("dragging"));
+  stage.addEventListener("drop", (event) => { event.preventDefault(); $("dropZone").classList.remove("dragging"); handleFile(event.dataTransfer.files[0]); });
   $("scanButton").addEventListener("click", runScan);
-  $("loadDemoButton").addEventListener("click", async () => loadDocument(await loadTextDocument(new File([demoText], "confidential-employment-contract.txt", { type: "text/plain" }))));
-  $("loadDemoPdfButton").addEventListener("click", async () => loadDocument(await loadPdfDocument(await createDemoPdf())));
+  $("loadDemoButton").addEventListener("click", loadDemoText);
+  $("loadDemoPdfButton").addEventListener("click", loadDemoPdf);
+  $("menuDemoText").addEventListener("click", loadDemoText);
+  $("menuDemoPdf").addEventListener("click", loadDemoPdf);
+  $("pagePrev").addEventListener("click", () => goToPage(state.pdfPage - 1));
+  $("pageNext").addEventListener("click", () => goToPage(state.pdfPage + 1));
+  $("pageInput").addEventListener("change", (event) => goToPage(Number(event.target.value)));
+  $("zoomIn").addEventListener("click", () => stepZoom(1));
+  $("zoomOut").addEventListener("click", () => stepZoom(-1));
+  $("thumbList").addEventListener("click", (event) => {
+    const thumb = event.target.closest(".thumb");
+    if (thumb) goToPage(Number(thumb.dataset.page));
+  });
+  for (const button of document.querySelectorAll(".rail-button")) button.addEventListener("click", () => activatePane(button.dataset.pane));
   $("redactButton").addEventListener("click", runRedaction);
   $("verifyButton").addEventListener("click", runVerification);
   $("exportButton").addEventListener("click", async () => {
@@ -381,23 +500,22 @@ export function initUI() {
     if (result.status === "success") toast("Verified copy downloaded locally");
     else toast("Export blocked until verification passes.");
   });
-  $("manualButton").addEventListener("click", () => { state.manualMode = !state.manualMode; toast(state.manualMode ? "Drag over the document to create a manual redaction." : "Manual redaction cancelled."); });
+  $("manualButton").addEventListener("click", () => {
+    setManualMode(!state.manualMode);
+    toast(state.manualMode ? "Drag over the page, or select text, to mark a region." : "Manual marking cancelled.");
+  });
   $("undoButton").addEventListener("click", () => { registry.restore(state.lastRedactionBatch); state.lastRedactionBatch = []; invalidate(); toast("Last redaction batch undone."); });
   $("findingList").addEventListener("click", (event) => {
     const control = event.target.closest("[data-action]");
     if (!control) {
       const row = event.target.closest(".finding");
-      if (row) {
-        state.pdfPage = Number(row.dataset.page) || 1;
-        renderPreview();
-      }
+      if (row && !event.target.matches("input")) goToPage(Number(row.dataset.page));
       return;
     }
     const id = control.dataset.id;
     if (control.dataset.action === "exclude" || control.dataset.action === "include" || control.dataset.action === "restore") registry[control.dataset.action === "exclude" ? "exclude" : "restore"]([id]);
     invalidate();
   });
-  $("developerToggle").addEventListener("click", () => { $("developerPanel").hidden = !$("developerPanel").hidden; });
   for (const name of Object.keys(toolMap)) $("developerTool").append(new Option(name, name));
   $("developerRun").addEventListener("click", async () => {
     try {
