@@ -171,7 +171,7 @@ test("synthetic text replacement removes originals, reports placeholders, and op
   const artifactText = await state.artifact.blob.text();
   assert.equal(originals.some((value) => artifactText.includes(value)), false);
   assert.equal(artifactText.includes("user_alpha@redacta.local"), true);
-  assert.equal(artifactText.includes("4000 0000 0000 0000"), true);
+  assert.equal(artifactText.includes("4000 0000 0000 0002"), true);
   const result = await verifyRedaction(context);
   assert.equal(result.passed, true);
   assert.equal(result.remainingFindings, 0);
@@ -181,7 +181,7 @@ test("synthetic text replacement removes originals, reports placeholders, and op
 });
 
 test("synthetic placeholder collisions are not counted as original values", async () => {
-  const card = "4000 0000 0000 0000";
+  const card = "4000 0000 0000 0002";
   const email = "user_alpha@redacta.local";
   const registry = createFindingRegistry();
   const document = await loadTextDocument(`Email ${email} card ${card}`);
