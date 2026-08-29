@@ -27,6 +27,7 @@ const toolMap = { inspectDocument, scanDocumentPII, applyRedactions, verifyRedac
 const state = { document: null, artifact: null, verification: null, maskMode: "blackout", revision: 0, lastRedactionBatch: [], manualMode: false, pdfPage: 1, zoom: 1 };
 const registry = createFindingRegistry();
 const $ = (id) => document.getElementById(id);
+const plural = (count, noun) => `${count} ${noun}${count === 1 ? "" : "s"}`;
 const ZOOM_STEPS = [0.5, 0.67, 0.8, 1, 1.25, 1.5, 2];
 const TYPE_LABELS = {
   ssn: "SSN",
@@ -95,6 +96,31 @@ function safeResult(result) {
   return summary;
 }
 
+function summarizeResult(name, result) {
+  const safe = safeResult(result);
+  if (safe.status && !["success", "verified", "failed"].includes(safe.status)) {
+    return safe.message ? `${safe.status} — ${safe.message}` : safe.status;
+  }
+  switch (name) {
+    case "inspectDocument":
+      return [result.fileType, plural(result.pageCount ?? 1, "page"), result.documentSize].filter(Boolean).join(" · ");
+    case "scanDocumentPII":
+      return `${plural(safe.totalDetected ?? 0, "finding")} detected`;
+    case "applyRedactions":
+      return `${plural(safe.totalRedacted ?? 0, "region")} masked · ${safe.maskMode}`;
+    case "verifyRedaction":
+      return safe.passed
+        ? `passed · 0 remaining across ${Object.keys(safe.categories ?? {}).length} categories`
+        : `failed · ${plural(safe.remainingFindings ?? 0, "finding")} remaining`;
+    case "getFindingDetails":
+      return [result.type, result.location].filter(Boolean).join(" · ") || "finding not found";
+    case "exportSanitizedDocument":
+      return `${safe.filename} · verified`;
+    default:
+      return safe.status ?? "success";
+  }
+}
+
 function addActivity(name, args, result) {
   $("activityLog").querySelector(".activity-item.muted")?.remove();
   const item = document.createElement("div");
@@ -106,7 +132,7 @@ function addActivity(name, args, result) {
   const title = document.createElement("strong");
   const details = document.createElement("p");
   title.textContent = name;
-  details.textContent = `${summarizeArgs(args)} → ${JSON.stringify(safeResult(result))}`;
+  details.textContent = `${summarizeArgs(args)} → ${summarizeResult(name, result)}`;
   body.append(title, details);
   item.append(icon, body);
   $("activityLog").append(item);
@@ -261,10 +287,12 @@ function renderThumbnails() {
   const list = $("thumbList");
   if (!state.document) {
     list.replaceChildren(Object.assign(document.createElement("p"), { className: "thumb-empty", textContent: "No pages yet" }));
+    $("thumbCount").textContent = "";
     thumbKey = null;
     return;
   }
   const pageCount = state.document.kind === "pdf" ? state.document.pageCount : 1;
+  $("thumbCount").textContent = String(pageCount);
   const key = `${state.document.name}:${state.artifact?.digest ?? "source"}:${pageCount}`;
   if (thumbKey !== key) {
     thumbKey = key;
@@ -344,7 +372,7 @@ function render() {
   $("statusExport").textContent = verified ? "unlocked" : "blocked";
   $("verifiedStat").textContent = verified ? "VERIFIED" : "—";
   $("verificationMessage").textContent = state.verification && !verified
-    ? `⚠ Verification failed — ${state.verification.remainingFindings} findings remain. Export blocked.`
+    ? `⚠ Verification failed — ${plural(state.verification.remainingFindings, "sensitive value")} still present (${state.verification.extractableFindings ?? 0} extractable as text, ${state.verification.unmaskedRegions ?? 0} unmasked). Export blocked.`
     : "";
   if (state.verification?.integrityFailure) $("verificationMessage").textContent = "⚠ Verification failed — generated artifact integrity check failed. Export blocked.";
   const list = $("findingList");
@@ -352,22 +380,56 @@ function render() {
   if (!findings.length) {
     list.innerHTML = '<div class="empty-state">Run a local scan to see<br />privacy-safe findings.</div>';
   } else {
-    for (const [index, finding] of findings.entries()) {
+    for (const finding of findings) {
       const row = document.createElement("div");
       row.className = `finding${finding.status === "redacted" ? " redacted" : ""}${finding.status === "excluded" ? " excluded" : ""}`;
       row.dataset.findingId = finding.id;
       row.dataset.page = finding.page || 1;
-      row.innerHTML = `<input type="checkbox" data-index="${index}" ${finding.status === "redacted" ? "disabled" : ""} ${finding.status === "excluded" ? "" : "checked"} /><span class="finding-dot"></span><span class="finding-info"><strong>${escapeHtml(TYPE_LABELS[finding.type] ?? finding.type.replaceAll("_", " "))}</strong><small>${finding.id} · ${escapeHtml(finding.location || "local")}</small></span><span class="confidence">${finding.confidence.toFixed(2)}</span><span class="finding-actions"><span class="finding-tag">${finding.status}</span><button class="finding-control" data-action="${finding.status === "excluded" ? "include" : "exclude"}" data-id="${finding.id}">${finding.status === "excluded" ? "Include" : "Exclude"}</button>${finding.status === "redacted" ? `<button class="finding-control" data-action="restore" data-id="${finding.id}">Restore</button>` : ""}</span>`;
+      row.innerHTML = `<input type="checkbox" data-id="${finding.id}" aria-label="Include ${finding.id} in the next redaction" ${finding.status === "redacted" ? "disabled" : ""} ${finding.status === "excluded" ? "" : "checked"} /><span class="finding-dot"></span><span class="finding-info"><strong>${escapeHtml(TYPE_LABELS[finding.type] ?? finding.type.replaceAll("_", " "))}</strong><small>${finding.id} · ${escapeHtml(finding.location || "local")}</small></span><span class="confidence">${finding.confidence.toFixed(2)}</span><span class="finding-actions"><span class="finding-tag">${finding.status}</span>${finding.status === "redacted" ? `<button class="finding-control" data-action="restore" data-id="${finding.id}">Restore</button>` : ""}</span>`;
       list.append(row);
     }
   }
-  $("redactButton").disabled = !findings.some((finding) => finding.status !== "redacted" && finding.status !== "excluded");
+  renderCategorySummary(findings);
+  renderVerificationSummary();
+  const pending = findings.filter((finding) => finding.status === "pending");
+  const selectable = findings.filter((finding) => finding.status !== "redacted");
+  $("listToolbar").hidden = !findings.length;
+  $("selectionCount").textContent = `${pending.length} selected of ${findings.length}`;
+  $("selectAll").disabled = pending.length === selectable.length;
+  $("selectNone").disabled = !pending.length;
+  $("maskModeSelect").value = state.maskMode;
+  $("redactButton").disabled = !pending.length;
   $("verifyButton").disabled = !findings.some((finding) => finding.status === "redacted") && !state.artifact;
   $("exportButton").disabled = !verified;
   $("undoButton").disabled = !state.lastRedactionBatch.length;
   renderViewerChrome();
   renderThumbnails();
   renderPreview();
+}
+
+function renderCategorySummary(findings) {
+  const summary = $("categorySummary");
+  summary.hidden = !findings.length;
+  const counts = new Map();
+  for (const finding of findings) counts.set(finding.type, (counts.get(finding.type) ?? 0) + 1);
+  summary.replaceChildren(...[...counts].map(([type, count]) => {
+    const chip = document.createElement("span");
+    chip.className = "category-chip";
+    chip.append(TYPE_LABELS[type] ?? type.replaceAll("_", " "), Object.assign(document.createElement("strong"), { textContent: String(count) }));
+    return chip;
+  }));
+}
+
+function renderVerificationSummary() {
+  const summary = $("verificationSummary");
+  const passed = Boolean(state.verification?.passed);
+  summary.hidden = !passed;
+  if (!passed) return;
+  const categories = Object.keys(state.verification.categories ?? {}).length;
+  summary.replaceChildren(
+    Object.assign(document.createElement("strong"), { textContent: "Verification passed" }),
+    Object.assign(document.createElement("p"), { textContent: `Rescanned the generated artifact across ${categories} categories — nothing sensitive is extractable as text, and every detected finding is masked.` }),
+  );
 }
 
 function setManualMode(enabled) {
@@ -438,7 +500,8 @@ async function runScan() {
 }
 
 async function runRedaction() {
-  const targetIds = [...document.querySelectorAll(".finding input:checked")].map((input) => registry.all()[Number(input.dataset.index)].id);
+  const targetIds = registry.all().filter((finding) => finding.status === "pending").map((finding) => finding.id);
+  if (!targetIds.length) return toast("Select at least one finding to redact.");
   const result = await executeTool("applyRedactions", { targetIds, maskMode: state.maskMode }, "user");
   if (result.status !== "success") toast(result.status === "denied" ? "Redaction cancelled." : "Redaction failed. No export was performed.");
   else {
@@ -456,13 +519,18 @@ async function runVerification() {
 function registerTools() {
   const execute = (name, input) => executeTool(name, input, "agent");
   if (!document.modelContext?.registerTool) {
-    $("nativeStatus").textContent = "Native WebMCP isn't available. Demo Mode is active.";
+    $("nativeStatusText").textContent = "Demo Mode";
+    $("nativeStatus").classList.add("is-demo");
+    $("nativeStatus").title = "Native WebMCP isn't available. Demo Mode is active — the same tools are callable from the tool console.";
     $("modeLabel").textContent = "DEMO MODE";
+    $("statusMode").textContent = "demo mode";
     Object.assign(window, Object.fromEntries(Object.keys(toolMap).map((name) => [name, (input) => execute(name, input)])));
     return;
   }
   for (const [name] of Object.entries(toolMap)) document.modelContext.registerTool({ name, description: TOOL_DESCRIPTIONS[name], inputSchema: TOOL_SCHEMAS[name], execute: (input) => execute(name, input) });
   $("modeLabel").textContent = "NATIVE WEBMCP";
+  $("nativeStatusText").textContent = `${Object.keys(toolMap).length} WebMCP tools registered`;
+  $("statusMode").textContent = "native";
 }
 
 export function initUI() {
@@ -505,16 +573,48 @@ export function initUI() {
     toast(state.manualMode ? "Drag over the page, or select text, to mark a region." : "Manual marking cancelled.");
   });
   $("undoButton").addEventListener("click", () => { registry.restore(state.lastRedactionBatch); state.lastRedactionBatch = []; invalidate(); toast("Last redaction batch undone."); });
+  $("findingList").addEventListener("change", (event) => {
+    const checkbox = event.target.closest("input[type=checkbox]");
+    if (!checkbox) return;
+    if (checkbox.checked) registry.restore([checkbox.dataset.id]);
+    else registry.exclude([checkbox.dataset.id]);
+    invalidate();
+  });
   $("findingList").addEventListener("click", (event) => {
-    const control = event.target.closest("[data-action]");
-    if (!control) {
-      const row = event.target.closest(".finding");
-      if (row && !event.target.matches("input")) goToPage(Number(row.dataset.page));
+    const control = event.target.closest("[data-action='restore']");
+    if (control) {
+      registry.restore([control.dataset.id]);
+      state.lastRedactionBatch = state.lastRedactionBatch.filter((id) => id !== control.dataset.id);
+      invalidate();
       return;
     }
-    const id = control.dataset.id;
-    if (control.dataset.action === "exclude" || control.dataset.action === "include" || control.dataset.action === "restore") registry[control.dataset.action === "exclude" ? "exclude" : "restore"]([id]);
+    const row = event.target.closest(".finding");
+    if (row && !event.target.matches("input")) goToPage(Number(row.dataset.page));
+  });
+  $("selectAll").addEventListener("click", () => {
+    registry.restore(registry.all().filter((finding) => finding.status === "excluded").map((finding) => finding.id));
     invalidate();
+  });
+  $("selectNone").addEventListener("click", () => {
+    registry.exclude(registry.all().map((finding) => finding.id));
+    invalidate();
+  });
+  $("maskModeSelect").addEventListener("change", (event) => {
+    state.maskMode = event.target.value;
+    invalidate();
+    toast(state.maskMode === "blackout" ? "Masks will be solid blackout bars." : "Masks will use synthetic replacement values.");
+  });
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") {
+      if (!$("permissionModal").hidden) return $("permissionCancel").click();
+      if (state.manualMode) setManualMode(false);
+      return;
+    }
+    if (event.target.matches("input, textarea, select") || event.ctrlKey || event.metaKey || event.altKey) return;
+    if (event.key === "ArrowLeft" || event.key === "PageUp") goToPage(state.pdfPage - 1);
+    else if (event.key === "ArrowRight" || event.key === "PageDown") goToPage(state.pdfPage + 1);
+    else if (event.key === "+" || event.key === "=") stepZoom(1);
+    else if (event.key === "-") stepZoom(-1);
   });
   for (const name of Object.keys(toolMap)) $("developerTool").append(new Option(name, name));
   $("developerRun").addEventListener("click", async () => {

@@ -21,7 +21,7 @@
           <span class="doc-chip-text"><strong id="fileName">No document open</strong><small id="fileMeta">Drop a PDF, TXT, JSON or CSV file to begin</small></span>
         </div>
         <div class="app-bar-right">
-          <span class="native-status" id="nativeStatus"><span class="status-dot"></span> WebMCP ready</span>
+          <span class="native-status" id="nativeStatus"><span class="status-dot"></span> <span id="nativeStatusText">WebMCP ready</span></span>
           <span class="local-pill"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M6 9V7a4 4 0 0 1 8 0v2" /><rect x="4.5" y="9" width="11" height="8" rx="1.5" /></svg> Local only</span>
         </div>
       </header>
@@ -48,7 +48,7 @@
         </nav>
 
         <aside class="thumb-pane" aria-label="Page thumbnails">
-          <div class="pane-head">Pages</div>
+          <div class="pane-head">Pages <span class="pane-head-count" id="thumbCount"></span></div>
           <div class="thumb-list" id="thumbList"><p class="thumb-empty">No pages yet</p></div>
         </aside>
 
@@ -99,9 +99,22 @@
             </header>
             <div class="task-scroll">
               <p class="task-hint">Findings are detected locally. The agent receives categories, locations and confidence — never the values.</p>
+              <div class="category-summary" id="categorySummary" hidden></div>
+              <div class="list-toolbar" id="listToolbar" hidden>
+                <span id="selectionCount">0 selected</span>
+                <button class="link-button" id="selectAll" type="button">Select all</button>
+                <button class="link-button" id="selectNone" type="button">Clear</button>
+              </div>
               <div class="finding-list" id="findingList"><div class="empty-state">Run a local scan to see privacy-safe findings.</div></div>
             </div>
             <div class="task-actions">
+              <div class="verify-summary" id="verificationSummary" hidden></div>
+              <label class="inline-field" for="maskModeSelect">Mask style
+                <select id="maskModeSelect">
+                  <option value="blackout">Blackout</option>
+                  <option value="synthetic_replacement">Synthetic replacement</option>
+                </select>
+              </label>
               <button class="button button-primary full" id="scanButton" type="button">Scan for sensitive data</button>
               <button class="button button-danger full" id="redactButton" type="button" disabled>Apply redactions</button>
               <div class="button-row">
@@ -162,6 +175,7 @@
         <span class="status-cell">Outbound requests <strong id="bottomUploadCount">0</strong></span>
         <span class="status-cell">Findings <strong id="statusFindings">0</strong></span>
         <span class="status-cell">Export <strong id="statusExport">blocked</strong></span>
+        <span class="status-cell">WebMCP <strong id="statusMode">—</strong></span>
         <span class="status-spacer"></span>
         <span class="status-cell muted">The WebMCP-native privacy boundary for AI agents</span>
       </footer>

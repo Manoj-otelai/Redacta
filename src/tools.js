@@ -94,8 +94,20 @@ export async function verifyRedaction(context, { categories } = {}) {
       return result;
     }
   }
-  const result = await verifyArtifact(context.state.artifact, categories ?? detectorTypes, context.registry.project);
-  result.remainingFindings = result.remaining.length;
+  const scope = categories?.length ? categories : detectorTypes;
+  const result = await verifyArtifact(context.state.artifact, scope, context.registry.project);
+  const unmasked = context.registry.all().filter((finding) => finding.status !== "redacted" && scope.includes(finding.type));
+  const countFor = (type) => Math.max(
+    result.remaining.filter((finding) => finding.type === type).length,
+    unmasked.filter((finding) => finding.type === type).length,
+  );
+  result.categories = Object.fromEntries(scope.map((type) => [type, countFor(type)]));
+  result.extractableFindings = result.remaining.length;
+  result.unmaskedRegions = unmasked.length;
+  result.unmasked = unmasked.map(context.registry.project);
+  result.remainingFindings = Object.values(result.categories).reduce((total, count) => total + count, 0);
+  result.passed = result.remainingFindings === 0;
+  result.status = result.passed ? "verified" : "failed";
   result.artifactDigest = context.state.artifact.digest;
   context.state.verification = result;
   context.onVerificationChanged?.(result);

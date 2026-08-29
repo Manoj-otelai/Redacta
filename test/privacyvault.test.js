@@ -58,7 +58,27 @@ test("verification exposes a count and projected remaining list", async () => {
   await applyRedactions(context, { targetIds: [first] });
   const result = await verifyRedaction(context);
   assert.equal(typeof result.remainingFindings, "number");
-  assert.equal(result.remainingFindings, result.remaining.length);
+  assert.equal(result.remainingFindings, 1);
+  assert.equal(result.remaining.length, 1);
+  assert.equal(result.remaining.every((finding) => !("value" in finding)), true);
+});
+
+test("verification fails on an unmasked finding even when the artifact has no extractable text", async () => {
+  const registry = createFindingRegistry();
+  const document = await loadTextDocument("SSN 123-45-6789 and email test@example.com");
+  const state = { artifact: null, verification: null, revision: 0, maskMode: "blackout" };
+  const context = { document, registry, state, onVerificationChanged() {}, onStateChanged() {} };
+  await scanDocumentPII(context);
+  const [excludedFinding] = registry.all();
+  registry.exclude([excludedFinding.id]);
+  await applyRedactions(context, { targetIds: registry.all().filter((finding) => finding.status === "pending").map((finding) => finding.id) });
+  context.state.artifact = { ...context.state.artifact, blob: new Blob([""], { type: "text/plain" }), digest: "" };
+  const result = await verifyRedaction(context);
+  assert.equal(result.passed, false);
+  assert.equal(result.extractableFindings, 0);
+  assert.equal(result.unmaskedRegions, 1);
+  assert.equal(result.categories[excludedFinding.type], 1);
+  assert.equal(JSON.stringify(result).includes("123-45-6789"), false);
 });
 
 test("verification blocks a tampered generated artifact", async () => {
