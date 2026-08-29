@@ -326,6 +326,7 @@ function setScanProgress(value) {
   if (value === null) return;
   $("scanBar").style.width = `${value}%`;
   $("scanPercent").textContent = `${value}%`;
+  $("scanTrack").setAttribute("aria-valuenow", String(value));
 }
 
 function clearLocator() {
@@ -409,6 +410,7 @@ function renderViewerChrome() {
   $("documentPreview").style.setProperty("--doc-zoom", state.zoom);
   $("documentPreview").classList.toggle("is-marking", state.manualMode);
   $("manualButton").classList.toggle("is-active", state.manualMode);
+  $("manualButton").setAttribute("aria-pressed", String(state.manualMode));
   $("dropZone").hidden = Boolean(state.document);
 }
 
@@ -581,9 +583,9 @@ function renderCertificateCard() {
   $("certificateDigest").textContent = certificate.artifactDigest;
   $("certificateIssuedAt").textContent = new Date(certificate.issuedAt).toLocaleString();
   $("certificateMaskMode").textContent = certificate.maskMode;
-  $("certificateArtifactCheck").textContent = `Artifact rescan · ${certificate.extractableFindings}`;
-  $("certificateCoverageCheck").textContent = `Mask coverage · ${certificate.unmaskedRegions}`;
-  $("certificateOriginalsCheck").textContent = `Original values absent · ${certificate.originalValuesFound}`;
+  $("certificateArtifactCheck").textContent = `Artifact rescan · ${certificate.extractableFindings} extractable`;
+  $("certificateCoverageCheck").textContent = `Mask coverage · ${certificate.unmaskedRegions} unmasked`;
+  $("certificateOriginalsCheck").textContent = `Original values · ${certificate.originalValuesFound} found`;
 }
 
 async function copyCertificateDigest() {
@@ -642,7 +644,11 @@ function stepZoom(direction) {
 }
 
 function activatePane(name) {
-  for (const button of document.querySelectorAll(".rail-button")) button.classList.toggle("is-active", button.dataset.pane === name);
+  for (const button of document.querySelectorAll(".rail-button")) {
+    const active = button.dataset.pane === name;
+    button.classList.toggle("is-active", active);
+    button.setAttribute("aria-pressed", String(active));
+  }
   for (const panel of document.querySelectorAll(".task-panel")) panel.classList.toggle("is-active", panel.id === `panel-${name}`);
 }
 

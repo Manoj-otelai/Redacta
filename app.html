@@ -34,20 +34,20 @@
 
       <div class="app-body">
         <nav class="tool-rail" id="toolRail" aria-label="Tools">
-          <button class="rail-button is-active" type="button" data-pane="redact" title="Redact tools">
+          <button class="rail-button is-active" type="button" data-pane="redact" aria-pressed="true" title="Redact tools">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h16" /><rect x="6" y="9" width="12" height="6" rx="1" /><path d="M9 9V5h6v4" /></svg>
             <span>Redact</span>
           </button>
-          <button class="rail-button" type="button" data-pane="agent" title="Agent activity">
+          <button class="rail-button" type="button" data-pane="agent" aria-pressed="false" title="Agent activity">
             <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="7" width="16" height="12" rx="2" /><path d="M9 12h.01M15 12h.01M10 16h4M12 4v3" /></svg>
             <span>Agent</span>
           </button>
-          <button class="rail-button" type="button" data-pane="privacy" title="Privacy boundary">
+          <button class="rail-button" type="button" data-pane="privacy" aria-pressed="false" title="Privacy boundary">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l7 3v6c0 4-3 7-7 9-4-2-7-5-7-9V6z" /><path d="M9 12l2 2 4-4" /></svg>
             <span>Privacy</span>
           </button>
           <div class="rail-spacer"></div>
-          <button class="rail-button" type="button" data-pane="developer" title="Developer panel">
+          <button class="rail-button" type="button" data-pane="developer" aria-pressed="false" title="Developer panel">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 8l-4 4 4 4M15 8l4 4-4 4" /></svg>
             <span>Console</span>
           </button>
@@ -75,7 +75,7 @@
             </div>
             <div class="tool-divider"></div>
             <div class="tool-group">
-              <button class="icon-button toggle" id="manualButton" type="button" title="Manual redaction — drag on the page or select text"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 16l3-1 8-8-2-2-8 8z" /><path d="M13 4l3 3" /></svg><span class="icon-button-text">Mark manually</span></button>
+              <button class="icon-button toggle" id="manualButton" type="button" aria-pressed="false" title="Manual redaction — drag on the page or select text"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 16l3-1 8-8-2-2-8 8z" /><path d="M13 4l3 3" /></svg><span class="icon-button-text">Mark manually</span></button>
             </div>
             <div class="toolbar-spacer"></div>
             <span class="ready-badge" id="processingBadge">READY</span>
@@ -109,7 +109,7 @@
               <p class="task-hint">Findings are detected locally. The agent receives categories, locations and confidence — never the values.</p>
               <div class="scan-progress" id="scanProgress" hidden>
                 <div class="scan-progress-head">Scanning locally <strong id="scanPercent">0%</strong></div>
-                <div class="scan-track"><span id="scanBar"></span></div>
+                <div class="scan-track" id="scanTrack" role="progressbar" aria-label="Local scan progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span id="scanBar"></span></div>
               </div>
               <div class="category-summary" id="categorySummary" hidden></div>
               <div class="list-toolbar" id="listToolbar" hidden>
@@ -217,7 +217,7 @@
         <span class="status-cell"><span class="status-dot ok"></span> Document stays local</span>
         <span class="status-cell">Outbound requests <strong id="bottomUploadCount">0</strong></span>
         <span class="status-cell">Findings <strong id="statusFindings">0</strong></span>
-        <span class="status-cell">Export <strong id="statusExport">blocked</strong></span>
+        <span class="status-cell" role="status">Export <strong id="statusExport">blocked</strong></span>
         <span class="status-cell">WebMCP <strong id="statusMode">—</strong></span>
         <span class="status-spacer"></span>
         <span class="status-cell muted">The WebMCP-native privacy boundary for AI agents</span>
