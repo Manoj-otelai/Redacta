@@ -5,6 +5,7 @@ import { syntheticReplacement } from "./detectors.js";
 import { installNetworkMonitor } from "./network.js";
 import {
   applyRedactions,
+  buildArtifact,
   exportSanitizedDocument,
   getVerificationCertificate,
   getFindingDetails,
@@ -59,6 +60,7 @@ let pdfRenderGeneration = 0;
 let thumbGeneration = 0;
 let thumbKey = null;
 let pdfCanvas = null;
+let previewRefreshBusy = false;
 const context = {
   state,
   registry,
@@ -233,11 +235,35 @@ function requestConfirmation(message) {
   });
 }
 
+async function refreshPreviewArtifact() {
+  if (previewRefreshBusy) return;
+  previewRefreshBusy = true;
+  try {
+    let revision = state.revision;
+    while (true) {
+      await buildArtifact(context, { maskMode: state.maskMode });
+      if (state.revision === revision) break;
+      revision = state.revision;
+      if (!registry.all().some((finding) => finding.status === "redacted")) {
+        state.artifact = null;
+        break;
+      }
+    }
+    render();
+  } catch {
+    state.artifact = null;
+    toast("Could not refresh the redaction preview.");
+  } finally {
+    previewRefreshBusy = false;
+  }
+}
+
 function invalidate() {
   state.revision += 1;
   state.artifact = null;
   state.verification = null;
   render();
+  if (registry.all().some((finding) => finding.status === "redacted")) void refreshPreviewArtifact();
 }
 
 function renderTextPreview() {
