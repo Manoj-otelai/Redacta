@@ -53,7 +53,7 @@
         <a class="btn btn-dark" href="./app.html">Open the workspace</a>
         <a class="btn btn-ghost" href="./app.html?demo=agent">Watch an agent run it →</a>
       </div>
-      <p class="hero-note">PDF · TXT · JSON · CSV — 0 bytes leave the tab</p>
+      <p class="hero-note">PDF · TXT · JSON · CSV — 0 bytes uploaded</p>
 
       <div class="preview">
         <div class="preview-bar">
@@ -104,7 +104,7 @@
         <div class="stat"><strong>0</strong><span>bytes of your document uploaded</span></div>
         <div class="stat"><strong>7</strong><span>WebMCP tools registered</span></div>
         <div class="stat"><strong>8</strong><span>detector categories, locally run</span></div>
-        <div class="stat"><strong>2</strong><span>independent checks before export</span></div>
+        <div class="stat"><strong>3</strong><span>independent checks before export</span></div>
       </div>
     </div>
   </section>
@@ -185,11 +185,11 @@
               <source srcset="./assets/img/art-boundary.webp" type="image/webp" />
               <img src="./assets/img/art-boundary.jpg" alt="A pane of frosted glass separating a black void from a warm white void" />
             </picture>
-            <div class="feature-float"><strong>Verification</strong>extractable: 0 · unmasked regions: 0 · export unlocked</div>
+            <div class="feature-float"><strong>Verification</strong>extractable: 0 · unmasked regions: 0 · original values: 0 · export unlocked</div>
           </div>
           <div class="feature-body">
             <h3>Proof taken from the artifact, not the UI</h3>
-            <p>Verification re-reads the generated file, extracts its text and rescans those bytes, then separately checks that every detected region is actually covered. Both must pass before export unlocks.</p>
+            <p>Verification re-reads the generated file and rescans its bytes, checks that no original detected value survives, and separately checks that every detected region is covered. All three must pass before export unlocks.</p>
             <a class="textlink" href="#guarantees">Read the guarantees →</a>
           </div>
           <p class="feature-proof">Export re-checks the artifact digest, so a file that changed after verification can't be downloaded as verified.</p>
@@ -249,7 +249,7 @@
       <div class="tool-list">
         <div class="tool"><code>inspectDocument</code><p>File type, page count, size, readiness. <b>No text.</b></p></div>
         <div class="tool"><code>scanDocumentPII</code><p>Counts, IDs, categories, locations, confidence. <b>No matched values.</b></p></div>
-        <div class="tool"><code>getFindingDetails</code><p>One projected finding, including its bounding box. <b>Still no value.</b></p></div>
+        <div class="tool"><code>getFindingDetails</code><p>One projected finding — a bounding box on PDFs, character offsets in text. <b>Still no value.</b></p></div>
         <div class="tool"><code>applyRedactions</code><p>Masks the selected findings locally. <b>Requires human approval.</b></p></div>
         <div class="tool"><code>verifyRedaction</code><p>Rescans artifact bytes and mask coverage, including original-value absence. <b>Returns pass or fail, per category.</b></p></div>
         <div class="tool"><code>exportSanitizedDocument</code><p>Downloads the sanitized copy. <b>Blocked until verification passes.</b></p></div>

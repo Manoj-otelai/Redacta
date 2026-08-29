@@ -144,7 +144,7 @@
               <span class="task-count mono" id="modeLabel">DEMO MODE</span>
             </header>
             <div class="task-scroll">
-              <p class="task-hint">Every WebMCP tool call is logged with the exact payload the agent received.</p>
+              <p class="task-hint">Every WebMCP tool call is logged with a safe argument summary and the exact result the agent received.</p>
               <div class="audit-card" id="payloadAudit">
                 <span class="audit-mark" id="auditMark">✓</span>
                 <div><strong id="auditHeadline">No payloads sent yet</strong><p id="auditDetail">Each result is scanned for the values it must never contain.</p></div>
@@ -194,7 +194,7 @@
               <ul class="safe-list"><li>Finding counts</li><li>Categories &amp; locations</li><li>Confidence scores</li><li>Verification status</li></ul>
               <p class="tiny-label">Agent cannot see</p>
               <ul class="locked-list"><li>Document contents</li><li>PII values &amp; secrets</li><li>Artifact bytes</li></ul>
-              <blockquote class="pitch">“The agent knows there are seven SSNs.<br /><em>It never knows what they are.</em>”</blockquote>
+              <blockquote class="pitch">“The agent knows the counts.<br /><em>It never knows the values.</em>”</blockquote>
             </div>
           </section>
 

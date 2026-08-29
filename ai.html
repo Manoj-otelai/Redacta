@@ -53,12 +53,12 @@ Redacta finds the sensitive data in a confidential file, masks it, and proves
 it is gone — entirely inside your browser. WebMCP hands your agent the
 controls, never the contents.
 
-PDF · TXT · JSON · CSV — 0 bytes leave the tab
+PDF · TXT · JSON · CSV — 0 bytes uploaded
 
   0  bytes of your document uploaded
   7  WebMCP tools registered
   8  detector categories, locally run
-  2  independent checks before export</pre></div>
+  3  independent checks before export</pre></div>
     <button class="copy" type="button" title="Copy this block">copy</button>
   </section>
 
@@ -105,11 +105,12 @@ are masked, so interpolated character geometry can't leak an edge.
 result: text layer removed · masks baked into the page image
 
 <span class="m-heading m-h3"><span class="m-hash">###</span> 3. Proof taken from the artifact, not the UI</span>
-Verification re-reads the generated file, extracts its text and rescans those
-bytes, then separately checks that every detected region is actually covered.
-Both must pass before export unlocks, and export re-checks the artifact digest
-so a file that changed after verification can't be downloaded as verified.
-result: extractable: 0 · unmasked regions: 0 · export unlocked</pre></div>
+Verification re-reads the generated file and rescans its bytes, checks that no
+original detected value survives, and separately checks that every detected
+region is covered. All three must pass before export unlocks. Export re-checks
+the artifact digest so a file that changed after verification can't be
+downloaded as verified.
+result: extractable: 0 · unmasked regions: 0 · original values: 0 · export unlocked</pre></div>
     <button class="copy" type="button" title="Copy this block">copy</button>
   </section>
 
@@ -143,7 +144,8 @@ Demo Mode console when it isn't — the same tools, the same boundary.
   → totalDetected, findings[{id, type, page, location, confidence}].
     No matched values.
 <span class="m-signature">getFindingDetails({findingId})</span>
-  → one projected finding, including its boundingBox.  Still no value.
+  → one projected finding: a boundingBox on PDFs, character offsets in
+    text.  Still no value.
 <span class="m-signature">applyRedactions({targetIds?, maskMode?})</span>
   → totalRedacted.  Requires human approval.
 <span class="m-signature">verifyRedaction({categories?})</span>
