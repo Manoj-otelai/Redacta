@@ -168,12 +168,6 @@ export async function rasterizePdf(pdfDocument, registry, maskMode = "blackout")
       }
     } else {
       const { groups, unplaced } = syntheticGroups(pageInfo, active);
-      for (const finding of unplaced) {
-        const box = finding.boundingBox;
-        if (!box) continue;
-        context.fillStyle = "#111816";
-        context.fillRect(box.x * 1.5, box.y * 1.5, box.width * 1.5, box.height * 1.5);
-      }
       for (const group of groups) {
         const entries = [...group.entries].sort((left, right) => left.start - right.start);
         const redacted = group.findings.filter((finding) => finding.status === "redacted");
@@ -222,6 +216,12 @@ export async function rasterizePdf(pdfDocument, registry, maskMode = "blackout")
           context.fillStyle = "#111816";
           context.fillRect(x, y, width, height);
         }
+      }
+      for (const finding of unplaced) {
+        const box = finding.boundingBox;
+        if (!box) continue;
+        context.fillStyle = "#111816";
+        context.fillRect(box.x * 1.5, box.y * 1.5, box.width * 1.5, box.height * 1.5);
       }
     }
     const png = await new Promise((resolve, reject) => canvas.toBlob((blob) => blob ? resolve(blob) : reject(new Error("Could not rasterize PDF page.")), "image/png"));

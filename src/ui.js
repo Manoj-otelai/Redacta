@@ -256,7 +256,7 @@ function renderTextPreview() {
         ? escapeHtml(syntheticReplacement(finding.type, value))
         : "█".repeat(Math.max(4, value.length))
       : escapeHtml(value);
-    parts.push(`<mark class="${finding.status === "redacted" ? "redacted" : ""}" data-finding="${escapeHtml(finding.type)}" data-start="${finding.charStart}" data-end="${finding.charEnd}">${body}</mark>`);
+    parts.push(`<mark class="${finding.status === "redacted" ? (state.maskMode === "synthetic_replacement" ? "redacted synthetic" : "redacted") : ""}" data-finding="${escapeHtml(finding.type)}" data-start="${finding.charStart}" data-end="${finding.charEnd}">${body}</mark>`);
     cursor = finding.charEnd;
   }
   parts.push(`<span data-start="${cursor}" data-end="${text.length}">${escapeHtml(text.slice(cursor))}</span>`);
