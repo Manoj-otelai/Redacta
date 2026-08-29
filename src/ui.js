@@ -23,9 +23,20 @@ Payroll will be deposited to card ending 4111 1111 1111 1111.
 Internal integration token: sk_live_51NORTHSTAR_8df7a.
 The parties agree to the terms and conditions set forth below.`;
 
+const loadDemoText = async () => loadDocument(await loadTextDocument(new File([demoText], "confidential-employment-contract.txt", { type: "text/plain" })));
+const loadDemoPdf = async () => loadDocument(await loadPdfDocument(await createDemoPdf()));
 const toolMap = { inspectDocument, scanDocumentPII, applyRedactions, verifyRedaction, getFindingDetails, exportSanitizedDocument };
 const state = { document: null, artifact: null, verification: null, maskMode: "blackout", revision: 0, lastRedactionBatch: [], manualMode: false, pdfPage: 1, zoom: 1 };
 const registry = createFindingRegistry();
+const audit = { calls: 0, leaks: 0 };
+const AGENT_STEPS = [
+  { key: "inspectDocument", label: "Inspect document" },
+  { key: "scanDocumentPII", label: "Scan for sensitive data" },
+  { key: "applyRedactions", label: "Apply redactions" },
+  { key: "verifyRedaction", label: "Verify sanitized copy" },
+  { key: "exportSanitizedDocument", label: "Export verified copy" },
+];
+const agentRun = { active: false, statuses: new Map(), notes: new Map() };
 const $ = (id) => document.getElementById(id);
 const plural = (count, noun) => `${count} ${noun}${count === 1 ? "" : "s"}`;
 const ZOOM_STEPS = [0.5, 0.67, 0.8, 1, 1.25, 1.5, 2];
@@ -99,6 +110,39 @@ function safeResult(result) {
   return summary;
 }
 
+function renderAudit() {
+  const card = $("payloadAudit");
+  if (!card) return;
+  card.className = "audit-card";
+  const clean = audit.calls > 0 && !audit.leaks;
+  const leaking = audit.leaks > 0;
+  if (clean) card.classList.add("is-clean");
+  if (leaking) card.classList.add("is-leak");
+  $("auditMark").textContent = leaking ? "!" : "✓";
+  $("auditHeadline").textContent = audit.calls === 0
+    ? "No payloads sent yet"
+    : leaking
+      ? `${plural(audit.leaks, "payload")} contained a sensitive value`
+      : `${plural(audit.calls, "payload")} returned · 0 sensitive values`;
+  $("auditDetail").textContent = audit.calls === 0
+    ? "Each result is scanned for the values it must never contain."
+    : leaking
+      ? "A tool result leaked a detected value — that is a bug, not a demo state."
+      : "Every WebMCP result was rescanned locally against the detected values. None appear.";
+}
+
+function auditPayload(result) {
+  const serialized = JSON.stringify(result ?? {}, null, 2);
+  const leaked = registry.all()
+    .map((finding) => finding.value)
+    .filter((value) => typeof value === "string" && value.trim().length >= 4)
+    .some((value) => serialized.includes(value));
+  audit.calls += 1;
+  if (leaked) audit.leaks += 1;
+  renderAudit();
+  return { serialized, leaked };
+}
+
 function summarizeResult(name, result) {
   const safe = safeResult(result);
   if (safe.status && !["success", "verified", "failed"].includes(safe.status)) {
@@ -136,7 +180,16 @@ function addActivity(name, args, result) {
   const details = document.createElement("p");
   title.textContent = name;
   details.textContent = `${summarizeArgs(args)} → ${summarizeResult(name, result)}`;
-  body.append(title, details);
+  const { serialized, leaked } = auditPayload(result);
+  const payload = document.createElement("details");
+  payload.className = "activity-payload";
+  if (leaked) payload.classList.add("is-leak");
+  const payloadSummary = document.createElement("summary");
+  payloadSummary.textContent = leaked ? "Payload · sensitive value detected" : "What the agent received";
+  const payloadBody = document.createElement("pre");
+  payloadBody.textContent = serialized.length > 1400 ? `${serialized.slice(0, 1400)}\n…` : serialized;
+  payload.append(payloadSummary, payloadBody);
+  body.append(title, details, payload);
   item.append(icon, body);
   $("activityLog").append(item);
 }
@@ -513,6 +566,102 @@ function activatePane(name) {
   for (const panel of document.querySelectorAll(".task-panel")) panel.classList.toggle("is-active", panel.id === `panel-${name}`);
 }
 
+function renderAgentSteps() {
+  const list = $("agentSteps");
+  if (!list) return;
+  list.replaceChildren(...AGENT_STEPS.map((step) => {
+    const status = agentRun.statuses.get(step.key) ?? "pending";
+    const item = document.createElement("li");
+    item.className = `agent-step is-${status}`;
+    item.dataset.key = step.key;
+    const mark = document.createElement("span");
+    mark.className = "step-mark";
+    mark.textContent = status === "done" ? "✓" : status === "failed" ? "!" : status === "running" ? "●" : "○";
+    const label = document.createElement("span");
+    label.className = "step-label";
+    label.textContent = step.label;
+    const note = document.createElement("span");
+    note.className = "step-note";
+    note.textContent = agentRun.notes.get(step.key) ?? "";
+    item.append(mark, label, note);
+    return item;
+  }));
+}
+
+function updateAgentDemoButtons() {
+  const running = agentRun.active;
+  $("runAgentDemo").disabled = running;
+  $("runAgentDemoPane").disabled = running;
+  $("runAgentDemoText").textContent = running ? "Running…" : "Run agent demo";
+  $("runAgentDemoPane").textContent = running ? "Running…" : "Run agent demo";
+  $("runAgentDemo").classList.toggle("is-running", running);
+}
+
+async function runAgentDemo() {
+  if (agentRun.active) return;
+  agentRun.active = true;
+  agentRun.statuses = new Map();
+  agentRun.notes = new Map();
+  activatePane("agent");
+  renderAgentSteps();
+  updateAgentDemoButtons();
+  let currentStep = null;
+  try {
+    if (!state.document) await loadDemoPdf();
+    for (let index = 0; index < AGENT_STEPS.length; index += 1) {
+      const step = AGENT_STEPS[index];
+      currentStep = step;
+      agentRun.statuses.set(step.key, "running");
+      renderAgentSteps();
+      updateAgentDemoButtons();
+      const args = step.key === "applyRedactions"
+        ? {
+            targetIds: registry.all()
+              .filter((finding) => finding.status === "pending")
+              .map((finding) => finding.id),
+            maskMode: state.maskMode,
+          }
+        : step.key === "exportSanitizedDocument"
+          ? { filename: `privacyvault-sanitized.${state.document.format}` }
+          : {};
+      let result;
+      if (step.key === "scanDocumentPII") setScanProgress(0);
+      try {
+        result = await executeTool(step.key, args, "agent");
+      } finally {
+        if (step.key === "scanDocumentPII") setScanProgress(null);
+      }
+      const success = ["success", "verified"].includes(result.status);
+      agentRun.statuses.set(step.key, success ? "done" : "failed");
+      agentRun.notes.set(step.key, success ? summarizeResult(step.key, result) : result.status);
+      renderAgentSteps();
+      if (step.key === "applyRedactions" && success) {
+        state.lastRedactionBatch = args.targetIds;
+        render();
+      }
+      if (!success) {
+        toast(result.status === "denied" ? "Agent request denied — the run stopped." : "The agent run stopped — nothing was exported.");
+        break;
+      }
+      if (index < AGENT_STEPS.length - 1) await new Promise((resolve) => setTimeout(resolve, 320));
+    }
+    if (AGENT_STEPS.every((step) => agentRun.statuses.get(step.key) === "done")) {
+      toast("Agent run complete · verified copy exported locally");
+    }
+  } catch {
+    if (currentStep) {
+      agentRun.statuses.set(currentStep.key, "failed");
+      agentRun.notes.set(currentStep.key, "error");
+      renderAgentSteps();
+    }
+    toast("The agent run stopped — nothing was exported.");
+  } finally {
+    agentRun.active = false;
+    renderAgentSteps();
+    updateAgentDemoButtons();
+  }
+}
+
 async function loadDocument(document) {
   state.document = document;
   state.revision += 1;
@@ -593,8 +742,6 @@ export function initUI() {
   state.networkUploads = 0;
   installNetworkMonitor((count) => { state.networkUploads = count; render(); });
   const openFile = () => $("fileInput").click();
-  const loadDemoText = async () => loadDocument(await loadTextDocument(new File([demoText], "confidential-employment-contract.txt", { type: "text/plain" })));
-  const loadDemoPdf = async () => loadDocument(await loadPdfDocument(await createDemoPdf()));
   $("browseButton").addEventListener("click", openFile);
   $("menuOpen").addEventListener("click", openFile);
   $("fileInput").addEventListener("change", (event) => handleFile(event.target.files[0]));
@@ -613,6 +760,9 @@ export function initUI() {
   $("zoomIn").addEventListener("click", () => stepZoom(1));
   $("zoomOut").addEventListener("click", () => stepZoom(-1));
   $("zoomFit").addEventListener("click", fitToWidth);
+  $("runAgentDemo").addEventListener("click", runAgentDemo);
+  $("runAgentDemoPane").addEventListener("click", runAgentDemo);
+  $("emptyAgentDemo").addEventListener("click", runAgentDemo);
   $("thumbList").addEventListener("click", (event) => {
     const thumb = event.target.closest(".thumb");
     if (thumb) goToPage(Number(thumb.dataset.page));
@@ -701,5 +851,8 @@ export function initUI() {
     }
   });
   registerTools();
+  renderAudit();
+  renderAgentSteps();
+  updateAgentDemoButtons();
   render();
 }

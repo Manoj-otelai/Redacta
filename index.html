@@ -21,6 +21,10 @@
           <span class="doc-chip-text"><strong id="fileName">No document open</strong><small id="fileMeta">Drop a PDF, TXT, JSON or CSV file to begin</small></span>
         </div>
         <div class="app-bar-right">
+          <button class="bar-action" id="runAgentDemo" type="button" title="Run the full agent workflow through WebMCP">
+            <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 2.5l1.6 3.9 3.9 1.6-3.9 1.6L10 13.5 8.4 9.6 4.5 8l3.9-1.6zM15.5 13l.8 1.7 1.7.8-1.7.8-.8 1.7-.8-1.7-1.7-.8 1.7-.8z" /></svg>
+            <span id="runAgentDemoText">Run agent demo</span>
+          </button>
           <span class="native-status" id="nativeStatus"><span class="status-dot"></span> <span id="nativeStatusText">WebMCP ready</span></span>
           <span class="local-pill"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M6 9V7a4 4 0 0 1 8 0v2" /><rect x="4.5" y="9" width="11" height="8" rx="1.5" /></svg> Local only</span>
         </div>
@@ -86,6 +90,7 @@
                 <button class="button button-secondary" id="loadDemoPdfButton" type="button">Load demo PDF</button>
                 <button class="button button-quiet" id="loadDemoButton" type="button">Load demo TXT</button>
               </div>
+              <p class="viewer-empty-hint">or <button class="link-button" id="emptyAgentDemo" type="button">watch the agent run the whole workflow</button></p>
               <p class="viewer-empty-formats">PDF · TXT · JSON · CSV</p>
               <input type="file" id="fileInput" accept=".pdf,.txt,.json,.csv,application/pdf,text/plain,application/json,text/csv" hidden />
             </div>
@@ -137,7 +142,15 @@
               <span class="task-count mono" id="modeLabel">DEMO MODE</span>
             </header>
             <div class="task-scroll">
-              <p class="task-hint">Every WebMCP tool call is logged with privacy-safe argument and result summaries.</p>
+              <p class="task-hint">Every WebMCP tool call is logged with the exact payload the agent received.</p>
+              <div class="audit-card" id="payloadAudit">
+                <span class="audit-mark" id="auditMark">✓</span>
+                <div><strong id="auditHeadline">No payloads sent yet</strong><p id="auditDetail">Each result is scanned for the values it must never contain.</p></div>
+              </div>
+              <p class="tiny-label">Agent workflow</p>
+              <ol class="agent-steps" id="agentSteps"></ol>
+              <button class="button button-primary full" id="runAgentDemoPane" type="button">Run agent demo</button>
+              <p class="tiny-label">Tool calls</p>
               <div class="activity-log" id="activityLog">
                 <div class="activity-item muted"><span class="activity-check">○</span><div><strong>Waiting for agent</strong><p>WebMCP tools are registered and ready to be called</p></div></div>
               </div>
