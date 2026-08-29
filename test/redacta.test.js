@@ -6,7 +6,7 @@ import { detectCandidates } from "../src/detectors.js";
 import { createFindingRegistry } from "../src/registry.js";
 import { loadTextDocument, createTextArtifact } from "../src/textDocument.js";
 import { applyRedactions, exportSanitizedDocument, getVerificationCertificate, scanDocumentPII, verifyRedaction } from "../src/tools.js";
-import { reconstructPageText } from "../src/pdfDocument.js";
+import { reconstructPageText, syntheticRange } from "../src/pdfDocument.js";
 
 test("Luhn accepts valid cards and rejects invalid cards", () => {
   assert.equal(isLuhnValid("4111 1111 1111 1111"), true);
@@ -143,6 +143,21 @@ test("PDF text reconstruction joins adjacent items and maps offsets", () => {
   assert.equal(result.text, "123-45-6789\n");
   assert.equal(result.items[0].start, 0);
   assert.equal(result.items[1].start, 7);
+});
+
+test("synthetic PDF ranges stay page-local when document offsets are global", () => {
+  const original = "123-45-6789";
+  const item = { str: `Employee SSN: ${original}` };
+  const pageStart = 900;
+  const entry = { start: 10, end: 10 + item.str.length, item };
+  const localStart = entry.start + item.str.indexOf(original);
+  const finding = { offset: pageStart + localStart, length: original.length };
+  const range = syntheticRange(finding.offset - pageStart, finding.length, [entry]);
+  const replacement = "219-48-7631";
+  const rebuilt = `${item.str.slice(0, range.start)}${replacement}${item.str.slice(range.end)}`;
+  assert.deepEqual(range, { start: localStart - entry.start, end: localStart - entry.start + original.length });
+  assert.equal(rebuilt.includes(original), false);
+  assert.equal(rebuilt.includes(replacement), true);
 });
 
 test("synthetic text replacement removes originals, reports placeholders, and opens export", async () => {

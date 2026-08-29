@@ -120,13 +120,13 @@ function syntheticGroups(pageInfo, findings) {
   return groups.values();
 }
 
-function syntheticRange(finding, entries) {
+export function syntheticRange(localStart, length, entries) {
   let cursor = 0;
   let start = null;
   let end = null;
-  const findingEnd = finding.offset + finding.length;
+  const findingEnd = localStart + length;
   for (const entry of entries) {
-    const overlapStart = Math.max(finding.offset, entry.start);
+    const overlapStart = Math.max(localStart, entry.start);
     const overlapEnd = Math.min(findingEnd, entry.end);
     if (overlapEnd > overlapStart) {
       start ??= cursor + overlapStart - entry.start;
@@ -164,9 +164,13 @@ export async function rasterizePdf(pdfDocument, registry, maskMode = "blackout")
         const redacted = group.findings.filter((finding) => finding.status === "redacted");
         if (!redacted.length) continue;
         let text = entries.map((entry) => entry.item.str).join("");
+        let safe = true;
         for (const finding of redacted.sort((left, right) => right.offset - left.offset)) {
-          const range = syntheticRange(finding, entries);
-          if (!range) continue;
+          const range = syntheticRange(finding.offset - pageInfo.start, finding.length, entries);
+          if (!range) {
+            safe = false;
+            continue;
+          }
           text = `${text.slice(0, range.start)}${syntheticReplacement(finding.type, finding.value)}${text.slice(range.end)}`;
         }
         const boxes = entries.map(({ item }) => itemBox(item, pageInfo.height));
@@ -176,6 +180,12 @@ export async function rasterizePdf(pdfDocument, registry, maskMode = "blackout")
         const bottom = Math.max(...boxes.map((box) => box.y + box.height)) * 1.5;
         const width = right - x;
         const height = bottom - y;
+        const leaked = redacted.some((finding) => typeof finding.value === "string" && finding.value.length > 0 && text.includes(finding.value));
+        if (!safe || leaked) {
+          context.fillStyle = "#111816";
+          context.fillRect(x, y, width, height);
+          continue;
+        }
         context.fillStyle = "#ffffff";
         context.fillRect(x, y, width, height);
         let fontSize = Math.max(10, height * 0.65);
