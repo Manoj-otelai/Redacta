@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="PrivacyVault — the WebMCP-native privacy boundary for AI agents." />
+    <title>PrivacyVault · Local document privacy</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="ambient ambient-one"></div>
+    <div class="ambient ambient-two"></div>
+    <header class="topbar">
+      <a class="brand" href="./"><span class="brand-mark">⌁</span> PrivacyVault</a>
+      <div class="topbar-right">
+        <span class="native-status" id="nativeStatus"><span class="status-dot"></span> WebMCP ready</span>
+        <span class="local-pill">● Local only</span>
+      </div>
+    </header>
+
+    <main class="shell">
+      <section class="hero">
+        <div>
+          <p class="eyebrow">THE WEBMCP-NATIVE PRIVACY BOUNDARY</p>
+          <h1>Let agents operate.<br /><em>Keep your data.</em></h1>
+          <p class="hero-copy">Scan, redact, verify, and export sensitive documents without exposing their contents to an AI agent.</p>
+        </div>
+        <div class="hero-proof">
+          <span class="proof-label">AGENT KNOWS</span>
+          <strong>17 findings</strong>
+          <span class="proof-label">AGENT NEVER SEES</span>
+          <strong class="coral">123-45-6789</strong>
+        </div>
+      </section>
+
+      <section class="workspace">
+        <div class="main-column">
+          <div class="upload-card" id="dropZone">
+            <div class="upload-icon">↑</div>
+            <div>
+              <h2>Drop a document to begin</h2>
+              <p>PDF · TXT · JSON · CSV <span>— processed entirely in your browser</span></p>
+            </div>
+            <button class="button button-light" id="browseButton">Browse files</button>
+            <input type="file" id="fileInput" accept=".pdf,.txt,.json,.csv,application/pdf,text/plain,application/json,text/csv" hidden />
+          </div>
+
+          <div class="document-card">
+            <div class="card-heading">
+              <div class="file-heading">
+                <span class="file-icon">▤</span>
+                <div><h2 id="fileName">confidential-employment-contract.txt</h2><p id="fileMeta">DEMO DOCUMENT · 6.4 KB · 4 PAGES</p></div>
+              </div>
+              <span class="ready-badge" id="processingBadge">READY</span>
+            </div>
+            <div class="document-body" id="documentPreview">
+              <div class="document-topline"><span>CONFIDENTIAL</span><span>EMPLOYMENT AGREEMENT / 2026</span></div>
+              <h3>Employment Agreement</h3>
+              <p>This Agreement is entered into by and between <mark data-finding="name">Jordan Lee</mark> (“Employee”) and Northstar Labs.</p>
+              <p>Employee identification: <mark data-finding="ssn">123-45-6789</mark><br />Contact: <mark data-finding="email">jordan.lee@northstar.example</mark> · <mark data-finding="phone">(415) 555-0198</mark></p>
+              <p>Payroll will be deposited to card ending <mark data-finding="credit_card">4111 1111 1111 1111</mark>. Internal integration token: <mark data-finding="api_key">sk_live_51NORTHSTAR_8df7a</mark>.</p>
+              <p class="document-muted">The parties agree to the terms and conditions set forth below. This document is synthetic data for demonstration purposes.</p>
+              <div class="document-footer"><span>NORTHSTAR LABS · PRIVATE</span><span>PAGE 1 / 4</span></div>
+            </div>
+            <div class="document-actions">
+              <button class="button button-primary" id="scanButton">Scan for sensitive data <span>→</span></button>
+              <button class="button button-ghost" id="loadDemoButton">Load demo document</button>
+            </div>
+          </div>
+        </div>
+
+        <aside class="inspector">
+          <div class="privacy-card">
+            <div class="privacy-title"><span class="lock">◆</span><span>PRIVACY BOUNDARY</span><span class="shield">✓</span></div>
+            <div class="privacy-row"><span>Original file</span><strong>LOCAL</strong></div>
+            <div class="privacy-row"><span>Network uploads</span><strong>0</strong></div>
+            <div class="privacy-divider"></div>
+            <p class="tiny-label">AGENT CAN SEE</p>
+            <ul class="safe-list"><li>Finding counts</li><li>Categories & locations</li><li>Verification status</li></ul>
+            <p class="tiny-label">AGENT CANNOT SEE</p>
+            <ul class="locked-list"><li>Document contents</li><li>PII values & secrets</li></ul>
+          </div>
+
+          <div class="findings-card">
+            <div class="card-heading compact"><h2>Privacy inspector</h2><span id="findingTotal">0 found</span></div>
+            <div class="finding-list" id="findingList"><div class="empty-state">Run a local scan to see<br />privacy-safe findings.</div></div>
+            <div class="inspector-actions">
+              <button class="button button-primary full" id="redactButton" disabled>Redact selected <span>→</span></button>
+              <button class="button button-ghost full" id="verifyButton" disabled>Verify sanitized copy</button>
+              <button class="button button-ghost full" id="exportButton" disabled>Export verified copy</button>
+            </div>
+          </div>
+        </aside>
+      </section>
+
+      <section class="activity-section">
+        <div class="section-label"><span class="live-dot"></span> AGENT ACTIVITY <span class="mono" id="modeLabel">DEMO MODE</span></div>
+        <div class="activity-grid" id="activityLog">
+          <div class="activity-item muted"><span class="activity-check">○</span><div><strong>Waiting for agent</strong><p>WebMCP tools are ready to be called</p></div></div>
+        </div>
+      </section>
+
+      <section class="bottom-proof">
+        <div><span class="big-stat">0</span><span>document uploads<br /><small>NETWORK REQUESTS</small></span></div>
+        <div><span class="big-stat">100%</span><span>local processing<br /><small>YOUR BROWSER</small></span></div>
+        <div><span class="big-stat" id="verifiedStat">—</span><span>verified export<br /><small>NOT UNTIL PROVEN</small></span></div>
+        <div class="quote">“The agent knows there are seven SSNs.<br /><em>It never knows what they are.</em>”</div>
+      </section>
+    </main>
+    <div class="toast" id="toast" role="status"></div>
+    <script src="app.js"></script>
+  </body>
+</html>
