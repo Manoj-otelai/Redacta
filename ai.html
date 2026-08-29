@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="description" content="Machine-readable Redacta: the whole landing page as plain markdown, for agents and crawlers." />
+<title>Redacta · machine readable</title>
+<link rel="icon" href="./assets/favicon.svg" type="image/svg+xml" />
+<link rel="alternate" type="text/html" href="./index.html" title="Human readable" />
+<link rel="stylesheet" href="./assets/fonts/fonts.css" />
+<link rel="stylesheet" href="./machine.css" />
+</head>
+<body>
+
+<div class="col">
+
+  <section class="blk">
+    <div class="blk-body"><pre><span class="m-heading m-h1"><span class="m-hash">#</span> Redacta</span>
+
+The WebMCP-native privacy boundary for AI agents. This page is the machine
+rendering of <a href="./index.html">redacta/index.html</a> — same content, no layout.
+
+<span class="m-label">[Open the workspace]</span>(<a href="./app.html">./app.html</a>)
+<span class="m-label">[Watch an agent run it]</span>(<a href="./app.html?demo=agent">./app.html?demo=agent</a>)</pre></div>
+    <button class="copy" type="button" title="Copy this block">copy</button>
+  </section>
+
+  <section class="blk">
+    <div class="blk-body"><pre>REDACTA
+<span class="m-section-label">Product:</span>
+  <span class="m-label">[Workspace]</span>(<a href="./app.html">./app.html</a>)
+  <span class="m-label">[Agent demo run]</span>(<a href="./app.html?demo=agent">./app.html?demo=agent</a>)
+  <span class="m-label">[Landing page, human]</span>(<a href="./index.html">./index.html</a>)
+<span class="m-section-label">Sections:</span>
+  <span class="m-label">[Privacy boundary]</span>(<a href="#boundary">#boundary</a>)
+  <span class="m-label">[How it works]</span>(<a href="#how">#how</a>)
+  <span class="m-label">[Guarantees]</span>(<a href="#guarantees">#guarantees</a>)
+  <span class="m-label">[WebMCP tools]</span>(<a href="#tools">#tools</a>)
+<span class="m-section-label">Source:</span>
+  <span class="m-label">[Repository]</span>(<a href="https://github.com/Manoj-otelai/Redacta">https://github.com/Manoj-otelai/Redacta</a>)
+  <span class="m-label">[README]</span>(<a href="https://github.com/Manoj-otelai/Redacta/blob/main/README.md">https://github.com/Manoj-otelai/Redacta#readme</a>)
+<span class="m-section-label">Runtime:</span>
+  supported input: pdf, txt, json, csv
+  processing: in-page, no backend, no upload endpoint
+  webmcp: document.modelContext, Demo Mode fallback</pre></div>
+    <button class="copy" type="button" title="Copy this block">copy</button>
+  </section>
+
+  <section class="blk">
+    <div class="blk-body"><pre><span class="m-heading m-h1"><span class="m-hash">#</span> Let agents work on documents they are never allowed to read</span>
+
+Redacta finds the sensitive data in a confidential file, masks it, and proves
+it is gone — entirely inside your browser. WebMCP hands your agent the
+controls, never the contents.
+
+PDF · TXT · JSON · CSV — 0 bytes leave the tab
+
+  0  bytes of your document uploaded
+  6  WebMCP tools registered
+  8  detector categories, locally run
+  2  independent checks before export</pre></div>
+    <button class="copy" type="button" title="Copy this block">copy</button>
+  </section>
+
+  <section class="blk" id="boundary">
+    <div class="blk-body"><pre><span class="m-heading m-h2"><span class="m-hash">##</span> Privacy boundary — the agent orchestrates, the browser executes</span>
+
+Redacta splits the work in two. Your agent decides what should happen — scan
+these categories, redact these findings, verify, export. The browser does all
+of it locally and answers with metadata only, so the values that made the
+document confidential never cross the boundary.
+
+What the agent receives:
+  type: "credit_card"      category
+  page: 3, region C        location
+  confidence: 0.98         score
+  status: "redacted"       state
+  passed: true             verification
+
+What it never receives:
+  ████████████  the SSN
+  ████████████  the card number
+  ████████████  the API key
+  ████████████  document text
+  ████████████  artifact bytes</pre></div>
+    <button class="copy" type="button" title="Copy this block">copy</button>
+  </section>
+
+  <section class="blk" id="how">
+    <div class="blk-body"><pre><span class="m-heading m-h2"><span class="m-hash">##</span> How it works — three things have to be true, or it isn't privacy</span>
+
+<span class="m-heading m-h3"><span class="m-hash">###</span> 1. Detection that never leaves the tab</span>
+Regex candidates are confirmed by structural validation — Luhn, SSN ranges,
+key and connection-string shapes — then scored. The pass runs in a Web Worker,
+so a long document stays interactive.
+detectors: ssn, credit_card, email, phone, api_key, private_key,
+           bearer_token, db_connection_string
+example: 17 findings · 7 ssn · 3 credit_card · 5 email · 2 api_key
+
+<span class="m-heading m-h3"><span class="m-hash">###</span> 2. Masks that survive a copy and paste</span>
+A black rectangle drawn over live text is not a redaction. Redacta renders
+every page, bakes padded masks into the pixels, and rebuilds an image-only
+PDF — the sensitive glyphs are gone, not covered. Whole overlapping text items
+are masked, so interpolated character geometry can't leak an edge.
+result: text layer removed · masks baked into the page image
+
+<span class="m-heading m-h3"><span class="m-hash">###</span> 3. Proof taken from the artifact, not the UI</span>
+Verification re-reads the generated file, extracts its text and rescans those
+bytes, then separately checks that every detected region is actually covered.
+Both must pass before export unlocks, and export re-checks the artifact digest
+so a file that changed after verification can't be downloaded as verified.
+result: extractable: 0 · unmasked regions: 0 · export unlocked</pre></div>
+    <button class="copy" type="button" title="Copy this block">copy</button>
+  </section>
+
+  <section class="blk" id="guarantees">
+    <div class="blk-body"><pre><span class="m-heading m-h2"><span class="m-hash">##</span> Guarantees — enforced in code, visible in the interface</span>
+
+- Local-only processing. Parsing, detection, masking, verification and export
+  all run in the page. Nothing is posted to a server.
+- No values in tool results. A fixed safe-field whitelist projects every
+  finding; raw matches stay in a private in-memory registry.
+- Human approval to mutate. Agent-requested redaction and export both stop for
+  an in-page confirmation with a visible timeout.
+- Byte-level verification. The exported artifact is rescanned, and mask
+  coverage is checked separately — app state is never treated as proof.
+- Verified-only export. Failed verification blocks the download and says how
+  many findings remain. Redacta never claims a file is clean when it isn't.
+- Measured network activity. A live counter reports outbound requests made by
+  the page. During a full demo run it stays at zero.</pre></div>
+    <button class="copy" type="button" title="Copy this block">copy</button>
+  </section>
+
+  <section class="blk" id="tools">
+    <div class="blk-body"><pre><span class="m-heading m-h2"><span class="m-hash">##</span> WebMCP surface — six tools, capabilities not contents</span>
+
+Registered on document.modelContext when native WebMCP is available, with a
+Demo Mode console when it isn't — the same tools, the same boundary.
+
+<span class="m-signature">inspectDocument({})</span>
+  → fileType, pageCount, documentSize, processingStatus.  No text.
+<span class="m-signature">scanDocumentPII({categories?})</span>
+  → totalDetected, findings[{id, type, page, location, confidence}].
+    No matched values.
+<span class="m-signature">getFindingDetails({findingId})</span>
+  → one projected finding, including its boundingBox.  Still no value.
+<span class="m-signature">applyRedactions({targetIds?, maskMode?})</span>
+  → totalRedacted.  Requires human approval.
+<span class="m-signature">verifyRedaction({categories?})</span>
+  → passed, remainingFindings, extractableFindings, unmaskedRegions,
+    per-category counts.
+<span class="m-signature">exportSanitizedDocument({filename?})</span>
+  → filename, verified.  Blocked until verification passes.
+
+agent prompt to try:
+  Inspect this document, scan it for SSNs, credit cards, emails and API keys,
+  redact every finding, verify the sanitized copy, then export it.</pre></div>
+    <button class="copy" type="button" title="Copy this block">copy</button>
+  </section>
+
+  <section class="blk">
+    <div class="blk-body"><pre>"The agent knows there are seven SSNs. It never knows what those SSNs are."
+
+<span class="m-heading m-h2"><span class="m-hash">##</span> Bring a confidential file. Keep it confidential.</span>
+
+Drop in a PDF, TXT, JSON or CSV — or load the synthetic contract and let the
+agent drive the whole run: scan, redact, verify, export.
+
+<span class="m-label">[Open the workspace]</span>(<a href="./app.html">./app.html</a>)
+<span class="m-label">[Watch an agent run it]</span>(<a href="./app.html?demo=agent">./app.html?demo=agent</a>)
+<span class="m-label">[Read the source]</span>(<a href="https://github.com/Manoj-otelai/Redacta">https://github.com/Manoj-otelai/Redacta</a>)</pre></div>
+    <button class="copy" type="button" title="Copy this block">copy</button>
+  </section>
+
+</div>
+
+<div class="modeswitch" role="group" aria-label="Page mode">
+  <a class="mode" href="./index.html"><i class="radio"></i>HUMAN</a>
+  <span class="mode is-on" aria-current="page"><i class="radio"></i>MACHINE</span>
+</div>
+
+<script>
+document.querySelectorAll(".copy").forEach((btn) => {
+  btn.addEventListener("click", async () => {
+    const text = btn.parentElement.querySelector("pre").innerText;
+    try {
+      await navigator.clipboard.writeText(text);
+      btn.textContent = "copied";
+    } catch {
+      btn.textContent = "failed";
+    }
+    setTimeout(() => { btn.textContent = "copy"; }, 1400);
+  });
+});
+</script>
+
+</body>
+</html>

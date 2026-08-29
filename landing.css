@@ -624,7 +624,7 @@ img { display: block; max-width: 100%; }
 .cta .hero-actions { margin-top: 28px; }
 
 .foot {
-  padding: 34px 0;
+  padding: 34px 0 96px;
   border-top: 1px solid var(--line);
   background: var(--paper);
 }
@@ -638,6 +638,55 @@ img { display: block; max-width: 100%; }
 .foot-links { display: flex; gap: 18px; margin-left: auto; }
 .foot-links a { text-decoration: none; }
 .foot-links a:hover { color: var(--ink); }
+
+.modeswitch {
+  position: fixed;
+  left: 50%;
+  bottom: 22px;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 4px;
+  padding: 5px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: rgba(250, 249, 247, .94);
+  backdrop-filter: blur(8px);
+  box-shadow: 0 10px 30px rgba(24, 24, 21, .14);
+  z-index: 40;
+}
+
+.mode {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 14px;
+  border: 0;
+  border-radius: 999px;
+  color: var(--greige-2);
+  font: 400 11px/1 var(--mono);
+  letter-spacing: .1em;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.mode:hover { color: var(--ink); }
+
+.mode.is-on {
+  background: var(--ink);
+  color: var(--paper);
+}
+
+.radio {
+  width: 9px;
+  height: 9px;
+  border: 1px solid var(--greige-3);
+  border-radius: 50%;
+}
+
+.mode.is-on .radio {
+  border-color: var(--paper);
+  box-shadow: inset 0 0 0 2px var(--ink), inset 0 0 0 9px var(--paper);
+}
 
 @media (max-width: 1020px) {
   .preview-grid,
@@ -659,4 +708,6 @@ img { display: block; max-width: 100%; }
   .btn { justify-content: center; }
   .tool { grid-template-columns: minmax(0, 1fr); gap: 6px; }
   .guarantees-head { flex-direction: column; align-items: start; }
+  .modeswitch { bottom: 14px; }
+  .mode { padding: 7px 12px; }
 }
