@@ -46,7 +46,7 @@ export function detectCandidates(text, categories = detectorTypes, onProgress) {
   }));
 }
 
-export function syntheticReplacement(type, value) {
+function primarySyntheticReplacement(type, value) {
   switch (type) {
     case "ssn": return "219-48-7631";
     case "credit_card": return "4000 0000 0000 0002";
@@ -58,4 +58,26 @@ export function syntheticReplacement(type, value) {
     case "private_key": return "-----BEGIN PRIVATE KEY-----\nREDACTED LOCAL KEY\n-----END PRIVATE KEY-----";
     default: return "[REDACTED]";
   }
+}
+
+const alternateSyntheticReplacements = {
+  ssn: "219-48-7642",
+  credit_card: "4000 0000 0000 0010",
+  email: "user_beta@redacta.local",
+  phone: "(202) 555-0111",
+};
+
+export function syntheticPlaceholderCandidates(type, value) {
+  return [...new Set([
+    primarySyntheticReplacement(type, value),
+    alternateSyntheticReplacements[type],
+    "[REDACTED]",
+  ].filter((candidate) => candidate !== undefined))];
+}
+
+export function syntheticReplacement(type, value, avoid = new Set()) {
+  const original = String(value);
+  const replacement = syntheticPlaceholderCandidates(type, value)
+    .find((candidate) => candidate !== original && !avoid.has(candidate));
+  return replacement ?? "[REDACTED]";
 }

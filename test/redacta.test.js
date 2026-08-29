@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { isLuhnValid, isStructurallyValidSsn } from "../src/validators.js";
 import { confidenceScore } from "../src/scoring.js";
-import { detectCandidates } from "../src/detectors.js";
+import { detectCandidates, syntheticReplacement } from "../src/detectors.js";
 import { createFindingRegistry } from "../src/registry.js";
 import { loadTextDocument, createTextArtifact } from "../src/textDocument.js";
 import { applyRedactions, exportSanitizedDocument, getVerificationCertificate, scanDocumentPII, verifyRedaction } from "../src/tools.js";
@@ -23,6 +23,19 @@ test("SSN structural validation rejects reserved ranges", () => {
 test("confidence score reflects validation layer", () => {
   assert.ok(confidenceScore({ type: "ssn", candidate: true, validated: true }) > confidenceScore({ type: "ssn", candidate: true, validated: false }));
   assert.equal(confidenceScore({ type: "ssn", candidate: false, validated: true }), 0);
+});
+
+test("synthetic replacements avoid primary placeholder collisions", () => {
+  const cases = [
+    ["ssn", "219-48-7631", "219-48-7642", "123-45-6789", "219-48-7631"],
+    ["credit_card", "4000 0000 0000 0002", "4000 0000 0000 0010", "4111 1111 1111 1111", "4000 0000 0000 0002"],
+    ["email", "user_alpha@redacta.local", "user_beta@redacta.local", "test@example.com", "user_alpha@redacta.local"],
+    ["phone", "(202) 555-0100", "(202) 555-0111", "(415) 555-0198", "(202) 555-0100"],
+  ];
+  for (const [type, placeholder, alternate, normalValue, primary] of cases) {
+    assert.equal(syntheticReplacement(type, placeholder, new Set([placeholder])), alternate);
+    assert.equal(syntheticReplacement(type, normalValue), primary);
+  }
 });
 
 test("tool payload projection never contains planted sensitive values", async () => {

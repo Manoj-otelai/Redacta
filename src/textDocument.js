@@ -26,11 +26,14 @@ function formatBytes(size) {
 
 export function createTextArtifact(document, registry, maskMode = "blackout") {
   let output = document.text;
+  const originalValues = new Set(registry.all()
+    .map((finding) => finding.value)
+    .filter((value) => typeof value === "string" && value.length > 0));
   for (const finding of registry.active()
     .filter((finding) => Number.isInteger(finding.offset) && Number.isInteger(finding.length) && finding.length > 0)
     .sort((left, right) => right.offset - left.offset)) {
     const replacement = maskMode === "synthetic_replacement"
-      ? syntheticReplacement(finding.type, finding.value)
+      ? syntheticReplacement(finding.type, finding.value, originalValues)
       : "█".repeat(Math.max(4, finding.value.length));
     output = `${output.slice(0, finding.offset)}${replacement}${output.slice(finding.offset + finding.length)}`;
   }

@@ -149,6 +149,9 @@ export async function rasterizePdf(pdfDocument, registry, maskMode = "blackout")
   await loadEngines();
   if (typeof globalThis.document?.createElement !== "function") throw new Error("PDF rasterization requires a browser canvas.");
   const output = await PDFDocument.create();
+  const originalValues = new Set(registry.all()
+    .map((finding) => finding.value)
+    .filter((value) => typeof value === "string" && value.length > 0));
   for (const pageInfo of pdfDocument.pages) {
     const viewport = pageInfo.page.getViewport({ scale: 1.5 });
     const canvas = globalThis.document.createElement("canvas");
@@ -180,7 +183,7 @@ export async function rasterizePdf(pdfDocument, registry, maskMode = "blackout")
             safe = false;
             continue;
           }
-          text = `${text.slice(0, range.start)}${syntheticReplacement(finding.type, finding.value)}${text.slice(range.end)}`;
+          text = `${text.slice(0, range.start)}${syntheticReplacement(finding.type, finding.value, originalValues)}${text.slice(range.end)}`;
         }
         const boxes = entries.map(({ item }) => itemBox(item, pageInfo.height));
         const x = Math.min(...boxes.map((box) => box.x)) * 1.5;
@@ -192,7 +195,6 @@ export async function rasterizePdf(pdfDocument, registry, maskMode = "blackout")
         const leaked = redacted.some((finding) => (
           typeof finding.value === "string"
           && finding.value.length > 0
-          && finding.value !== syntheticReplacement(finding.type, finding.value)
           && text.includes(finding.value)
         ));
         if (!safe || leaked) {

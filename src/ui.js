@@ -271,6 +271,9 @@ function renderTextPreview() {
   const findings = registry.all()
     .filter((finding) => Number.isInteger(finding.charStart) && Number.isInteger(finding.charEnd))
     .sort((left, right) => left.charStart - right.charStart);
+  const originalValues = new Set(registry.all()
+    .map((finding) => finding.value)
+    .filter((value) => typeof value === "string" && value.length > 0));
   const parts = [];
   let cursor = 0;
   for (const finding of findings) {
@@ -279,7 +282,7 @@ function renderTextPreview() {
     const value = text.slice(finding.charStart, finding.charEnd);
     const body = finding.status === "redacted"
       ? state.maskMode === "synthetic_replacement"
-        ? escapeHtml(syntheticReplacement(finding.type, value))
+        ? escapeHtml(syntheticReplacement(finding.type, value, originalValues))
         : "█".repeat(Math.max(4, value.length))
       : escapeHtml(value);
     parts.push(`<mark class="${finding.status === "redacted" ? (state.maskMode === "synthetic_replacement" ? "redacted synthetic" : "redacted") : ""}" data-finding="${escapeHtml(finding.type)}" data-start="${finding.charStart}" data-end="${finding.charEnd}">${body}</mark>`);

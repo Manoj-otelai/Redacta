@@ -1,15 +1,18 @@
-import { detectCandidates, syntheticReplacement } from "./detectors.js";
+import { detectCandidates, syntheticPlaceholderCandidates, syntheticReplacement } from "./detectors.js";
 
-const placeholderValues = new Set([
-  syntheticReplacement("ssn", ""),
-  syntheticReplacement("credit_card", ""),
-  syntheticReplacement("email", ""),
-  syntheticReplacement("phone", ""),
-  syntheticReplacement("api_key", "sk_live_example"),
-  syntheticReplacement("api_key", "ghp_example"),
-  syntheticReplacement("bearer_token", ""),
-  syntheticReplacement("private_key", ""),
-]);
+const placeholderValues = new Set();
+for (const [type, value] of [
+  ["ssn", ""],
+  ["credit_card", ""],
+  ["email", ""],
+  ["phone", ""],
+  ["api_key", "sk_live_example"],
+  ["api_key", "ghp_example"],
+  ["bearer_token", ""],
+  ["private_key", ""],
+]) {
+  for (const candidate of syntheticPlaceholderCandidates(type, value)) placeholderValues.add(candidate);
+}
 const dbPlaceholderTail = syntheticReplacement("db_connection_string", "postgres://user:password@localhost/database").split("://")[1];
 
 function isSyntheticPlaceholder(finding) {
@@ -26,7 +29,7 @@ export async function verifyArtifact(artifact, categories, project, originalValu
   const syntheticFindings = findings.filter(isSyntheticPlaceholder);
   const remaining = findings.filter((finding) => !isSyntheticPlaceholder(finding)).map(project).filter(Boolean);
   const originalValuesFound = originalValues.filter(({ type, value }) => {
-    if (typeof value !== "string" || value.length === 0 || value === syntheticReplacement(type, value)) return false;
+    if (typeof value !== "string" || value.length === 0) return false;
     return text.includes(value);
   }).length;
   const categoryNames = categories?.length ? categories : [...new Set(findings.map((finding) => finding.type))];
