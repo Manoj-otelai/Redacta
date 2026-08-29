@@ -172,6 +172,24 @@
                 <div class="privacy-row"><span>Outbound requests</span><strong id="networkUploads">0</strong></div>
                 <div class="privacy-row"><span>Processing</span><strong>100% IN BROWSER</strong></div>
               </div>
+              <article class="certificate-card" id="certificateCard" hidden>
+                <div class="certificate-head"><span class="certificate-seal">✓</span><div><strong>Certificate of cleanliness</strong><small>Metadata-only proof</small></div></div>
+                <p class="certificate-id mono" id="certificateId"></p>
+                <dl class="certificate-meta">
+                  <div><dt>Digest</dt><dd id="certificateDigest"></dd></div>
+                  <div><dt>Issued</dt><dd id="certificateIssuedAt"></dd></div>
+                  <div><dt>Mask mode</dt><dd id="certificateMaskMode"></dd></div>
+                </dl>
+                <ul class="certificate-checks">
+                  <li id="certificateArtifactCheck"></li>
+                  <li id="certificateCoverageCheck"></li>
+                  <li id="certificateOriginalsCheck"></li>
+                </ul>
+                <div class="button-row">
+                  <button class="button button-secondary" id="copyCertificateDigest" type="button">Copy digest</button>
+                  <button class="button button-secondary" id="downloadCertificate" type="button">Download certificate</button>
+                </div>
+              </article>
               <p class="tiny-label">Agent can see</p>
               <ul class="safe-list"><li>Finding counts</li><li>Categories &amp; locations</li><li>Confidence scores</li><li>Verification status</li></ul>
               <p class="tiny-label">Agent cannot see</p>

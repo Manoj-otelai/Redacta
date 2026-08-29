@@ -1,10 +1,12 @@
 import { createFindingRegistry } from "./registry.js";
 import { loadTextDocument } from "./textDocument.js";
 import { createDemoPdf, loadPdfDocument } from "./pdfDocument.js";
+import { syntheticReplacement } from "./detectors.js";
 import { installNetworkMonitor } from "./network.js";
 import {
   applyRedactions,
   exportSanitizedDocument,
+  getVerificationCertificate,
   getFindingDetails,
   inspectDocument,
   scanDocumentPII,
@@ -25,7 +27,7 @@ The parties agree to the terms and conditions set forth below.`;
 
 const loadDemoText = async () => loadDocument(await loadTextDocument(new File([demoText], "confidential-employment-contract.txt", { type: "text/plain" })));
 const loadDemoPdf = async () => loadDocument(await loadPdfDocument(await createDemoPdf()));
-const toolMap = { inspectDocument, scanDocumentPII, applyRedactions, verifyRedaction, getFindingDetails, exportSanitizedDocument };
+const toolMap = { inspectDocument, scanDocumentPII, applyRedactions, verifyRedaction, getFindingDetails, exportSanitizedDocument, getVerificationCertificate };
 const state = { document: null, artifact: null, verification: null, maskMode: "blackout", revision: 0, lastRedactionBatch: [], manualMode: false, pdfPage: 1, zoom: 1 };
 const registry = createFindingRegistry();
 const audit = { calls: 0, leaks: 0 };
@@ -103,7 +105,7 @@ function summarizeArgs(args = {}) {
 function safeResult(result) {
   if (!result || typeof result !== "object") return { status: "success" };
   const summary = {};
-  for (const key of ["status", "totalDetected", "totalRedacted", "verified", "passed", "remainingFindings", "filename", "maskMode", "message"]) {
+  for (const key of ["status", "totalDetected", "totalRedacted", "verified", "passed", "remainingFindings", "filename", "maskMode", "message", "certificateId"]) {
     if (result[key] !== undefined) summary[key] = result[key];
   }
   if (result.categories) summary.categories = result.categories;
@@ -163,6 +165,8 @@ function summarizeResult(name, result) {
       return [result.type, result.location].filter(Boolean).join(" · ") || "finding not found";
     case "exportSanitizedDocument":
       return `${safe.filename} · verified`;
+    case "getVerificationCertificate":
+      return result.certificate?.certificateId ? `certificate ${result.certificate.certificateId}` : safe.status;
     default:
       return safe.status ?? "success";
   }
@@ -247,7 +251,11 @@ function renderTextPreview() {
     if (finding.charStart < cursor) continue;
     parts.push(`<span data-start="${cursor}" data-end="${finding.charStart}">${escapeHtml(text.slice(cursor, finding.charStart))}</span>`);
     const value = text.slice(finding.charStart, finding.charEnd);
-    const body = finding.status === "redacted" ? "█".repeat(Math.max(4, value.length)) : escapeHtml(value);
+    const body = finding.status === "redacted"
+      ? state.maskMode === "synthetic_replacement"
+        ? escapeHtml(syntheticReplacement(finding.type, value))
+        : "█".repeat(Math.max(4, value.length))
+      : escapeHtml(value);
     parts.push(`<mark class="${finding.status === "redacted" ? "redacted" : ""}" data-finding="${escapeHtml(finding.type)}" data-start="${finding.charStart}" data-end="${finding.charEnd}">${body}</mark>`);
     cursor = finding.charEnd;
   }
@@ -467,7 +475,9 @@ function render() {
   $("statusExport").textContent = verified ? "unlocked" : "blocked";
   $("verifiedStat").textContent = verified ? "VERIFIED" : "—";
   $("verificationMessage").textContent = state.verification && !verified
-    ? `⚠ Verification failed — ${plural(state.verification.remainingFindings, "sensitive value")} still present (${state.verification.extractableFindings ?? 0} extractable as text, ${state.verification.unmaskedRegions ?? 0} unmasked). Export blocked.`
+    ? state.verification.originalValuesFound > 0
+      ? `⚠ Verification failed — ${plural(state.verification.originalValuesFound, "original value")} found in the generated artifact. Export blocked.`
+      : `⚠ Verification failed — ${plural(state.verification.remainingFindings, "sensitive value")} still present (${state.verification.extractableFindings ?? 0} extractable as text, ${state.verification.unmaskedRegions ?? 0} unmasked). Export blocked.`
     : "";
   if (state.verification?.integrityFailure) $("verificationMessage").textContent = "⚠ Verification failed — generated artifact integrity check failed. Export blocked.";
   const list = $("findingList");
@@ -486,6 +496,7 @@ function render() {
   }
   renderCategorySummary(findings);
   renderVerificationSummary();
+  renderCertificateCard();
   const pending = findings.filter((finding) => finding.status === "pending");
   const selectable = findings.filter((finding) => finding.status !== "redacted");
   $("listToolbar").hidden = !findings.length;
@@ -521,10 +532,53 @@ function renderVerificationSummary() {
   summary.hidden = !passed;
   if (!passed) return;
   const categories = Object.keys(state.verification.categories ?? {}).length;
+  const certificate = state.verification.certificate;
+  const certified = document.createElement("p");
+  certified.className = "certificate-summary";
+  certified.textContent = certificate
+    ? `Certified ${certificate.certificateId} · ${certificate.artifactDigest.slice(0, 12)}…`
+    : "Verified artifact certificate unavailable.";
   summary.replaceChildren(
     Object.assign(document.createElement("strong"), { textContent: "Verification passed" }),
     Object.assign(document.createElement("p"), { textContent: `Rescanned the generated artifact across ${categories} categories — nothing sensitive is extractable as text, and every detected finding is masked.` }),
+    certified,
   );
+}
+
+function renderCertificateCard() {
+  const card = $("certificateCard");
+  if (!card) return;
+  const certificate = state.verification?.passed ? state.verification.certificate : null;
+  card.hidden = !certificate;
+  if (!certificate) return;
+  $("certificateId").textContent = certificate.certificateId;
+  $("certificateDigest").textContent = certificate.artifactDigest;
+  $("certificateIssuedAt").textContent = new Date(certificate.issuedAt).toLocaleString();
+  $("certificateMaskMode").textContent = certificate.maskMode;
+  $("certificateArtifactCheck").textContent = `Artifact rescan · ${certificate.extractableFindings}`;
+  $("certificateCoverageCheck").textContent = `Mask coverage · ${certificate.unmaskedRegions}`;
+  $("certificateOriginalsCheck").textContent = `Original values absent · ${certificate.originalValuesFound}`;
+}
+
+async function copyCertificateDigest() {
+  const digest = state.verification?.certificate?.artifactDigest;
+  if (!digest) return;
+  try {
+    await navigator.clipboard.writeText(digest);
+    toast("Certificate digest copied.");
+  } catch {
+    toast("Copying is blocked here · select the digest instead.");
+  }
+}
+
+function downloadCertificate() {
+  const certificate = state.verification?.certificate;
+  if (!certificate) return;
+  context.downloadArtifact(
+    new Blob([JSON.stringify(certificate, null, 2)], { type: "application/json" }),
+    `redacta-certificate-${certificate.certificateId}.json`,
+  );
+  toast("Certificate downloaded locally.");
 }
 
 function setManualMode(enabled) {
@@ -770,6 +824,8 @@ export function initUI() {
   for (const button of document.querySelectorAll(".rail-button")) button.addEventListener("click", () => activatePane(button.dataset.pane));
   $("redactButton").addEventListener("click", runRedaction);
   $("verifyButton").addEventListener("click", runVerification);
+  $("copyCertificateDigest").addEventListener("click", copyCertificateDigest);
+  $("downloadCertificate").addEventListener("click", downloadCertificate);
   $("exportButton").addEventListener("click", async () => {
     const result = await executeTool("exportSanitizedDocument", { filename: `redacta-sanitized.${state.document.format}` }, "user");
     if (result.status === "success") toast("Verified copy downloaded locally");

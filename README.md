@@ -1,4 +1,19 @@
-# Redacta
+<p align="center">
+  <picture>
+    <source srcset="assets/logo-dark.svg" media="(prefers-color-scheme: dark)" />
+    <source srcset="assets/logo.svg" media="(prefers-color-scheme: light)" />
+    <img src="assets/logo.svg" alt="" width="72" height="72" />
+  </picture>
+</p>
+
+<h1 align="center">redacta</h1>
+
+<p align="center">
+  The WebMCP-native privacy boundary for AI agents.<br />
+  <a href="https://github.com/Manoj-otelai/Redacta">Source</a> ·
+  <a href="app.html">Workspace</a> ·
+  <a href="ai.html">Machine-readable page</a>
+</p>
 
 Redacta is a browser-local, zero-backend document privacy workspace. An AI agent can inspect, scan, redact, verify, and export without receiving document contents or sensitive values.
 
@@ -30,7 +45,7 @@ npm test
 
 ## WebMCP tools
 
-All six tools are registered on `document.modelContext` when native WebMCP is available, and are exposed in Demo Mode otherwise. Every description promises that contents and sensitive values are never returned.
+All seven tools are registered on `document.modelContext` when native WebMCP is available, and are exposed in Demo Mode otherwise. Every description promises that contents and sensitive values are never returned.
 
 - `inspectDocument({})` — local metadata; returns `fileType`, human-readable `documentSize`, page count, and status.
 - `scanDocumentPII({categories?: ["ssn", "credit_card", "email", "phone", "api_key", "private_key", "bearer_token", "db_connection_string"]})` — privacy-safe findings.
@@ -39,7 +54,13 @@ All six tools are registered on `document.modelContext` when native WebMCP is av
 - `getFindingDetails({findingId: string})` — returns one projected finding.
 - `exportSanitizedDocument({filename?: string})` — downloads only after verification passes.
 
+- `getVerificationCertificate({})` - returns metadata-only proof for a verified artifact, including its digest and check counts.
+
 Mutating agent calls require an in-page human confirmation. Activity entries contain only whitelisted argument and result summaries.
+
+## Synthetic replacement and certificates
+
+Synthetic replacement keeps the document readable with plausible local placeholders. Verification recognizes those placeholders and reports their count separately, while also checking that none of the original raw values remain anywhere in the artifact; either an original value or an uncovered region fails verification. A passing run can issue a metadata-only certificate with the artifact digest, document metadata, and numeric check results, never document text or finding values.
 
 ## Architecture decisions
 
@@ -51,3 +72,4 @@ Mutating agent calls require an in-page human confirmation. Activity entries con
 - **Artifact-byte verification:** verification re-reads the generated Blob, extracts text from PDFs, decodes text artifacts, and rescans the resulting bytes. App state is never treated as proof.
 - **Mask-coverage verification:** a rasterized PDF has no text layer, so a text rescan alone would pass while a skipped finding is still legible in the page image. Verification therefore also fails when any detected finding is left unmasked, and reports the two checks separately (`extractableFindings`, `unmaskedRegions`).
 - **Explicit privacy projection:** the finding registry stores raw values privately and exposes only a fixed safe-field whitelist to tools, UI activity, and errors.
+- **Synthetic replacement and certificates:** synthetic mode substitutes plausible local placeholders while verification excludes those known placeholders from remaining findings and separately counts them. A passing run can issue a metadata-only certificate containing the artifact digest, document metadata, and check counts; it contains no document text or values.

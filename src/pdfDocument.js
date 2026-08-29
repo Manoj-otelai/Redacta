@@ -1,4 +1,5 @@
 import "./pdfCompat.js";
+import { syntheticReplacement } from "./detectors.js";
 
 let pdfjsLib;
 let PDFDocument;
@@ -127,9 +128,21 @@ export async function rasterizePdf(pdfDocument, registry, maskMode = "blackout")
       context.fillStyle = maskMode === "blackout" ? "#111816" : "#ffffff";
       context.fillRect(x, y, width, height);
       if (maskMode === "synthetic_replacement") {
-        context.fillStyle = "#111816";
-        context.font = `${Math.max(10, height * 0.65)}px sans-serif`;
-        context.fillText("[REDACTED]", x + 2, y + height * 0.75);
+        const replacement = syntheticReplacement(finding.type, finding.value);
+        let fontSize = Math.max(10, height * 0.65);
+        const availableWidth = Math.max(0, width - 4);
+        context.font = `${fontSize}px sans-serif`;
+        while (fontSize > 7 && context.measureText(replacement).width > availableWidth) {
+          fontSize -= 1;
+          context.font = `${fontSize}px sans-serif`;
+        }
+        if (context.measureText(replacement).width <= availableWidth) {
+          context.fillStyle = "#111816";
+          context.fillText(replacement, x + 2, y + height * 0.75);
+        } else {
+          context.fillStyle = "#111816";
+          context.fillRect(x, y, width, height);
+        }
       }
     }
     const png = await new Promise((resolve, reject) => canvas.toBlob((blob) => blob ? resolve(blob) : reject(new Error("Could not rasterize PDF page.")), "image/png"));

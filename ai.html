@@ -56,7 +56,7 @@ controls, never the contents.
 PDF · TXT · JSON · CSV — 0 bytes leave the tab
 
   0  bytes of your document uploaded
-  6  WebMCP tools registered
+  7  WebMCP tools registered
   8  detector categories, locally run
   2  independent checks before export</pre></div>
     <button class="copy" type="button" title="Copy this block">copy</button>
@@ -132,7 +132,7 @@ result: extractable: 0 · unmasked regions: 0 · export unlocked</pre></div>
   </section>
 
   <section class="blk" id="tools">
-    <div class="blk-body"><pre><span class="m-heading m-h2"><span class="m-hash">##</span> WebMCP surface — six tools, capabilities not contents</span>
+    <div class="blk-body"><pre><span class="m-heading m-h2"><span class="m-hash">##</span> WebMCP surface — seven tools, capabilities not contents</span>
 
 Registered on document.modelContext when native WebMCP is available, with a
 Demo Mode console when it isn't — the same tools, the same boundary.
@@ -148,9 +148,12 @@ Demo Mode console when it isn't — the same tools, the same boundary.
   → totalRedacted.  Requires human approval.
 <span class="m-signature">verifyRedaction({categories?})</span>
   → passed, remainingFindings, extractableFindings, unmaskedRegions,
-    per-category counts.
+    per-category counts, syntheticPlaceholders, originalValuesFound.
 <span class="m-signature">exportSanitizedDocument({filename?})</span>
   → filename, verified.  Blocked until verification passes.
+
+<span class="m-signature">getVerificationCertificate({})</span>
+  metadata-only certificate for a verified artifact.  No contents or values.
 
 agent prompt to try:
   Inspect this document, scan it for SSNs, credit cards, emails and API keys,

@@ -5,7 +5,7 @@ import { confidenceScore } from "../src/scoring.js";
 import { detectCandidates } from "../src/detectors.js";
 import { createFindingRegistry } from "../src/registry.js";
 import { loadTextDocument, createTextArtifact } from "../src/textDocument.js";
-import { applyRedactions, exportSanitizedDocument, scanDocumentPII, verifyRedaction } from "../src/tools.js";
+import { applyRedactions, exportSanitizedDocument, getVerificationCertificate, scanDocumentPII, verifyRedaction } from "../src/tools.js";
 import { reconstructPageText } from "../src/pdfDocument.js";
 
 test("Luhn accepts valid cards and rejects invalid cards", () => {
@@ -143,4 +143,80 @@ test("PDF text reconstruction joins adjacent items and maps offsets", () => {
   assert.equal(result.text, "123-45-6789\n");
   assert.equal(result.items[0].start, 0);
   assert.equal(result.items[1].start, 7);
+});
+
+test("synthetic text replacement removes originals, reports placeholders, and opens export", async () => {
+  const originals = ["123-45-6789", "test@example.com", "4111 1111 1111 1111"];
+  const registry = createFindingRegistry();
+  const document = await loadTextDocument(`SSN ${originals[0]} email ${originals[1]} card ${originals[2]}`);
+  const state = { artifact: null, verification: null, revision: 0, maskMode: "synthetic_replacement" };
+  const context = { document, registry, state, onVerificationChanged() {}, onStateChanged() {}, downloadArtifact() {} };
+  await scanDocumentPII(context);
+  await applyRedactions(context, { targetIds: registry.all().map((finding) => finding.id), maskMode: "synthetic_replacement" });
+  const artifactText = await state.artifact.blob.text();
+  assert.equal(originals.some((value) => artifactText.includes(value)), false);
+  const result = await verifyRedaction(context);
+  assert.equal(result.passed, true);
+  assert.equal(result.remainingFindings, 0);
+  assert.equal(result.syntheticPlaceholders, 3);
+  assert.equal(result.originalValuesFound, 0);
+  assert.equal((await exportSanitizedDocument(context)).status, "success");
+});
+
+test("original values fail verification independently of detector counts", async () => {
+  const registry = createFindingRegistry();
+  const document = await loadTextDocument("SSN 123-45-6789");
+  const state = { artifact: null, verification: null, revision: 0, maskMode: "blackout" };
+  const context = { document, registry, state, onVerificationChanged() {}, onStateChanged() {} };
+  await scanDocumentPII(context);
+  await applyRedactions(context, { targetIds: registry.all().map((finding) => finding.id) });
+  state.artifact = { ...state.artifact, blob: new Blob(["SSN 123-45-6789"], { type: "text/plain" }), digest: "" };
+  const result = await verifyRedaction(context);
+  assert.equal(result.passed, false);
+  assert.equal(result.originalValuesFound, 1);
+});
+
+test("certificate IDs are deterministic for identical bytes and differ for different bytes", async () => {
+  async function verify(source) {
+    const registry = createFindingRegistry();
+    const document = await loadTextDocument(source);
+    const state = { artifact: null, verification: null, revision: 0, maskMode: "blackout" };
+    const context = { document, registry, state, onVerificationChanged() {}, onStateChanged() {} };
+    await scanDocumentPII(context);
+    await applyRedactions(context, { targetIds: registry.all().map((finding) => finding.id) });
+    return verifyRedaction(context);
+  }
+  const first = await verify("A SSN 123-45-6789");
+  const second = await verify("A SSN 123-45-6789");
+  const different = await verify("B SSN 234-56-7890");
+  assert.equal(first.certificate.certificateId, second.certificate.certificateId);
+  assert.notEqual(first.certificate.certificateId, different.certificate.certificateId);
+  assert.match(first.certificate.certificateId, /^RDCT-[0-9A-F]{4}(?:-[0-9A-F]{4}){2}$/);
+});
+
+test("certificate metadata contains no original values and is available through its tool", async () => {
+  const original = "123-45-6789";
+  const registry = createFindingRegistry();
+  const document = await loadTextDocument(`SSN ${original}`);
+  const state = { artifact: null, verification: null, revision: 0, maskMode: "synthetic_replacement" };
+  const context = { document, registry, state, onVerificationChanged() {}, onStateChanged() {} };
+  await scanDocumentPII(context);
+  await applyRedactions(context, { targetIds: registry.all().map((finding) => finding.id), maskMode: "synthetic_replacement" });
+  const result = await verifyRedaction(context);
+  const certificate = result.certificate;
+  assert.equal(JSON.stringify(certificate).includes(original), false);
+  const exposed = await getVerificationCertificate(context);
+  assert.deepEqual(exposed.certificate, certificate);
+});
+
+test("blackout mode still reports no synthetic placeholders", async () => {
+  const registry = createFindingRegistry();
+  const document = await loadTextDocument("SSN 123-45-6789");
+  const state = { artifact: null, verification: null, revision: 0, maskMode: "blackout" };
+  const context = { document, registry, state, onVerificationChanged() {}, onStateChanged() {} };
+  await scanDocumentPII(context);
+  await applyRedactions(context, { targetIds: registry.all().map((finding) => finding.id), maskMode: "blackout" });
+  const result = await verifyRedaction(context);
+  assert.equal(result.passed, true);
+  assert.equal(result.syntheticPlaceholders, 0);
 });

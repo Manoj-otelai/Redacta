@@ -18,6 +18,7 @@ export const TOOL_SCHEMAS = {
   verifyRedaction: { type: "object", properties: { categories: { type: "array", items: { type: "string", enum: detectorTypes } } }, additionalProperties: false },
   getFindingDetails: { type: "object", properties: { findingId: { type: "string" } }, required: ["findingId"], additionalProperties: false },
   exportSanitizedDocument: { type: "object", properties: { filename: { type: "string" } }, additionalProperties: false },
+  getVerificationCertificate: { type: "object", properties: {}, additionalProperties: false },
 };
 
 export const TOOL_DESCRIPTIONS = {
@@ -27,6 +28,7 @@ export const TOOL_DESCRIPTIONS = {
   verifyRedaction: "Rescan the generated artifact bytes and report whether redaction passed; never returns document contents or sensitive values.",
   getFindingDetails: "Retrieve privacy-safe details for one finding; never returns document contents or sensitive values.",
   exportSanitizedDocument: "Download the verified local artifact; never returns document contents or sensitive values.",
+  getVerificationCertificate: "Retrieve metadata-only proof that the local artifact passed verification; never returns document contents or sensitive values.",
 };
 
 function invalidate(context) {
@@ -88,6 +90,9 @@ export async function verifyRedaction(context, { categories } = {}) {
         categories: Object.fromEntries(categoryNames.map((type) => [type, 0])),
         message: "Generated artifact integrity check failed.",
         integrityFailure: true,
+        syntheticPlaceholders: 0,
+        originalValuesFound: 0,
+        certificate: null,
       };
       context.state.verification = result;
       context.onVerificationChanged?.(result);
@@ -95,7 +100,12 @@ export async function verifyRedaction(context, { categories } = {}) {
     }
   }
   const scope = categories?.length ? categories : detectorTypes;
-  const result = await verifyArtifact(context.state.artifact, scope, context.registry.project);
+  const result = await verifyArtifact(
+    context.state.artifact,
+    scope,
+    context.registry.project,
+    context.registry.all().map((finding) => finding.value),
+  );
   const unmasked = context.registry.all().filter((finding) => finding.status !== "redacted" && scope.includes(finding.type));
   const countFor = (type) => Math.max(
     result.remaining.filter((finding) => finding.type === type).length,
@@ -106,12 +116,46 @@ export async function verifyRedaction(context, { categories } = {}) {
   result.unmaskedRegions = unmasked.length;
   result.unmasked = unmasked.map(context.registry.project);
   result.remainingFindings = Object.values(result.categories).reduce((total, count) => total + count, 0);
-  result.passed = result.remainingFindings === 0;
+  result.passed = result.remainingFindings === 0 && result.originalValuesFound === 0;
   result.status = result.passed ? "verified" : "failed";
   result.artifactDigest = context.state.artifact.digest;
+  if (result.passed) {
+    const groups = context.state.artifact.digest.slice(0, 12).toUpperCase().match(/.{4}/g).join("-");
+    result.certificate = {
+      certificateId: `RDCT-${groups}`,
+      digestAlgorithm: "SHA-256",
+      artifactDigest: result.artifactDigest,
+      issuedAt: new Date().toISOString(),
+      documentName: context.document.name,
+      fileType: context.document.format,
+      pageCount: context.document.pageCount,
+      maskMode: context.state.artifact.maskMode,
+      findingsRedacted: context.registry.active().length,
+      categoriesChecked: scope.length,
+      extractableFindings: result.extractableFindings,
+      unmaskedRegions: result.unmaskedRegions,
+      syntheticPlaceholders: result.syntheticPlaceholders,
+      originalValuesFound: result.originalValuesFound,
+    };
+  } else {
+    result.certificate = null;
+  }
   context.state.verification = result;
   context.onVerificationChanged?.(result);
   return result;
+}
+
+export async function getVerificationCertificate(context) {
+  const verification = context.state.verification;
+  const artifact = context.state.artifact;
+  if (!verification?.passed || !verification.certificate || !artifact?.blob) {
+    return { status: "blocked", message: "A verified artifact is required before retrieving its certificate." };
+  }
+  const actualDigest = await digestBlob(artifact.blob);
+  if (actualDigest !== verification.artifactDigest || actualDigest !== verification.certificate.artifactDigest) {
+    return { status: "blocked", message: "The verified artifact is stale. Verify it again before retrieving its certificate." };
+  }
+  return { status: "success", certificate: verification.certificate };
 }
 
 export async function getFindingDetails(context, { findingId } = {}) {
