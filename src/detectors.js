@@ -25,7 +25,7 @@ export function detectCandidates(text, categories = detectorTypes, onProgress) {
     while ((match = definition.regex.exec(text))) {
       const value = match[0];
       const validated = validateCandidate(definition.type, value);
-      if (definition.type === "credit_card" && !validated) continue;
+      if (definition.type === "credit_card" && !validated && value !== syntheticReplacement(definition.type, value)) continue;
       candidates.push({
         type: definition.type,
         label: definition.label,
@@ -49,8 +49,8 @@ export function detectCandidates(text, categories = detectorTypes, onProgress) {
 export function syntheticReplacement(type, value) {
   switch (type) {
     case "ssn": return "219-48-7631";
-    case "credit_card": return "4242 4242 4242 4242";
-    case "email": return "redacted@example.invalid";
+    case "credit_card": return "4000 0000 0000 0000";
+    case "email": return "user_alpha@redacta.local";
     case "phone": return "(202) 555-0100";
     case "api_key": return value.startsWith("gh") ? "ghp_REDACTED_LOCAL_ONLY" : "sk_test_REDACTED_LOCAL_ONLY";
     case "bearer_token": return "Bearer REDACTED_LOCAL_ONLY_TOKEN";

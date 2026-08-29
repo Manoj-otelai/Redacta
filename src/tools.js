@@ -104,7 +104,7 @@ export async function verifyRedaction(context, { categories } = {}) {
     context.state.artifact,
     scope,
     context.registry.project,
-    context.registry.all().map((finding) => finding.value),
+    context.registry.all().map((finding) => ({ type: finding.type, value: finding.value })),
   );
   const unmasked = context.registry.all().filter((finding) => finding.status !== "redacted" && scope.includes(finding.type));
   const countFor = (type) => Math.max(

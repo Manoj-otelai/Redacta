@@ -180,7 +180,12 @@ export async function rasterizePdf(pdfDocument, registry, maskMode = "blackout")
         const bottom = Math.max(...boxes.map((box) => box.y + box.height)) * 1.5;
         const width = right - x;
         const height = bottom - y;
-        const leaked = redacted.some((finding) => typeof finding.value === "string" && finding.value.length > 0 && text.includes(finding.value));
+        const leaked = redacted.some((finding) => (
+          typeof finding.value === "string"
+          && finding.value.length > 0
+          && finding.value !== syntheticReplacement(finding.type, finding.value)
+          && text.includes(finding.value)
+        ));
         if (!safe || leaked) {
           context.fillStyle = "#111816";
           context.fillRect(x, y, width, height);
@@ -229,7 +234,7 @@ export async function createDemoPdf() {
       "CONFIDENTIAL - REDACTA DEMO / PAGE 2",
       "Employee SSN: 234-56-7890",
       "Benefits contact: jordan.two@northstar.example",
-      "Payroll card: 4242 4242 4242 4242",
+      "Payroll card: 5500 0000 0000 0004",
       "Integration key: sk_test_NORTHSTAR_02ef45gh",
     ],
     [

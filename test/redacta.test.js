@@ -170,12 +170,29 @@ test("synthetic text replacement removes originals, reports placeholders, and op
   await applyRedactions(context, { targetIds: registry.all().map((finding) => finding.id), maskMode: "synthetic_replacement" });
   const artifactText = await state.artifact.blob.text();
   assert.equal(originals.some((value) => artifactText.includes(value)), false);
+  assert.equal(artifactText.includes("user_alpha@redacta.local"), true);
+  assert.equal(artifactText.includes("4000 0000 0000 0000"), true);
   const result = await verifyRedaction(context);
   assert.equal(result.passed, true);
   assert.equal(result.remainingFindings, 0);
   assert.equal(result.syntheticPlaceholders, 3);
   assert.equal(result.originalValuesFound, 0);
   assert.equal((await exportSanitizedDocument(context)).status, "success");
+});
+
+test("synthetic placeholder collisions are not counted as original values", async () => {
+  const card = "4000 0000 0000 0000";
+  const email = "user_alpha@redacta.local";
+  const registry = createFindingRegistry();
+  const document = await loadTextDocument(`Email ${email} card ${card}`);
+  const state = { artifact: null, verification: null, revision: 0, maskMode: "synthetic_replacement" };
+  const context = { document, registry, state, onVerificationChanged() {}, onStateChanged() {} };
+  await scanDocumentPII(context);
+  await applyRedactions(context, { targetIds: registry.all().map((finding) => finding.id), maskMode: "synthetic_replacement" });
+  const result = await verifyRedaction(context);
+  assert.equal(result.passed, true);
+  assert.equal(result.originalValuesFound, 0);
+  assert.equal(result.syntheticPlaceholders, 2);
 });
 
 test("original values fail verification independently of detector counts", async () => {

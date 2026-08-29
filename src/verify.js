@@ -25,7 +25,12 @@ export async function verifyArtifact(artifact, categories, project, originalValu
   const findings = detectCandidates(text, categories);
   const syntheticFindings = findings.filter(isSyntheticPlaceholder);
   const remaining = findings.filter((finding) => !isSyntheticPlaceholder(finding)).map(project).filter(Boolean);
-  const originalValuesFound = originalValues.filter((value) => typeof value === "string" && value.length > 0 && text.includes(value)).length;
+  const originalValuesFound = originalValues.filter((entry) => {
+    const value = typeof entry === "string" ? entry : entry?.value;
+    const type = typeof entry === "string" ? null : entry?.type;
+    if (typeof value !== "string" || value.length === 0 || (type && value === syntheticReplacement(type, value))) return false;
+    return text.includes(value);
+  }).length;
   const categoryNames = categories?.length ? categories : [...new Set(findings.map((finding) => finding.type))];
   return {
     status: remaining.length || originalValuesFound ? "failed" : "verified",
