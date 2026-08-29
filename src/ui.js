@@ -855,4 +855,5 @@ export function initUI() {
   renderAgentSteps();
   updateAgentDemoButtons();
   render();
+  if (new URLSearchParams(location.search).get("demo") === "agent") runAgentDemo();
 }

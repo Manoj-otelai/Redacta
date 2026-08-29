@@ -15,7 +15,7 @@ npx serve .
 python -m http.server 4173
 ```
 
-Open the displayed local URL. No build step is required. Netlify publishes the repository root via `netlify.toml`.
+Open the displayed local URL. `index.html` is the landing page; the workspace is `app.html`, and `app.html?demo=agent` starts the full agent run on load. No build step is required. Netlify publishes the repository root via `netlify.toml`. Fonts (`assets/fonts/`) and landing artwork (`assets/img/`) are served from the repository, so the pages make no external requests.
 
 ## Test and vendor
 
