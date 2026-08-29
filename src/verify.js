@@ -20,12 +20,12 @@ function isSyntheticPlaceholder(finding) {
   return finding.type === "db_connection_string" && finding.value.split("://")[1] === dbPlaceholderTail;
 }
 
-export async function verifyArtifact(artifact, categories, project, originalValues = []) {
+export async function verifyArtifact(artifact, categories, project, originalValues = [], customPatterns = []) {
   const bytes = await artifact.blob.arrayBuffer();
   const text = artifact.kind === "pdf"
     ? await (await import("./pdfDocument.js")).extractPdfText(bytes)
     : new TextDecoder().decode(bytes);
-  const findings = detectCandidates(text, categories);
+  const findings = detectCandidates(text, categories, undefined, customPatterns);
   const syntheticFindings = findings.filter(isSyntheticPlaceholder);
   const remaining = findings.filter((finding) => !isSyntheticPlaceholder(finding)).map(project).filter(Boolean);
   const originalValuesFound = originalValues.filter(({ type, value }) => {

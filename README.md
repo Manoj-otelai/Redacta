@@ -45,7 +45,7 @@ npm test
 
 ## WebMCP tools
 
-All seven tools are registered on `document.modelContext` when native WebMCP is available, and are exposed in Demo Mode otherwise. Every description promises that contents and sensitive values are never returned.
+All eight tools are registered on `document.modelContext` when native WebMCP is available, and are exposed in Demo Mode otherwise. Every description promises that contents and sensitive values are never returned.
 
 - `inspectDocument({})` — local metadata; returns `fileType`, `filename`, human-readable `documentSize`, `pageCount`, and `processingStatus`.
 - `scanDocumentPII({categories?: ["ssn", "credit_card", "email", "phone", "api_key", "private_key", "bearer_token", "db_connection_string"]})` — privacy-safe findings.
@@ -55,8 +55,11 @@ All seven tools are registered on `document.modelContext` when native WebMCP is 
 - `exportSanitizedDocument({filename?: string})` — downloads only after verification passes.
 
 - `getVerificationCertificate({})` - returns metadata-only proof for a verified artifact, including its digest and check counts.
+- `registerCustomPattern({name, pattern, flags?})` - registers a local custom detector after human approval; returns only the registered name and count.
 
 Mutating agent calls require an in-page human confirmation. Activity entries contain only summarized arguments and the privacy-safe results returned to the agent.
+
+Custom patterns are limited to five registered definitions and run locally; their results expose counts and locations only and never document contents or sensitive values. Every agent-initiated registration requires human approval, and validation rejects unsafe, empty, uncompilable, or slow patterns before the approval prompt.
 
 ## Synthetic replacement and certificates
 

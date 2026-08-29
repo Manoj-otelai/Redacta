@@ -2,10 +2,10 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { isLuhnValid, isStructurallyValidSsn } from "../src/validators.js";
 import { confidenceScore } from "../src/scoring.js";
-import { detectCandidates, syntheticReplacement } from "../src/detectors.js";
+import { detectCandidates, syntheticReplacement, validateCustomPattern } from "../src/detectors.js";
 import { createFindingRegistry } from "../src/registry.js";
 import { loadTextDocument, createTextArtifact } from "../src/textDocument.js";
-import { applyRedactions, exportSanitizedDocument, getVerificationCertificate, scanDocumentPII, verifyRedaction } from "../src/tools.js";
+import { applyRedactions, exportSanitizedDocument, getVerificationCertificate, registerCustomPattern, scanDocumentPII, verifyRedaction } from "../src/tools.js";
 import { reconstructPageText, syntheticGroups, syntheticRange } from "../src/pdfDocument.js";
 
 test("Luhn accepts valid cards and rejects invalid cards", () => {
@@ -38,6 +38,69 @@ test("synthetic replacements avoid primary placeholder collisions", () => {
   }
 });
 
+test("custom pattern validation rejects unsafe definitions and normalizes valid ones", () => {
+  assert.equal(validateCustomPattern({ name: "1bad", pattern: "EMP-\\d+" }).ok, false);
+  assert.equal(validateCustomPattern({ name: "SSN", pattern: "EMP-\\d+" }).ok, false);
+  assert.equal(validateCustomPattern({ name: "employee_id", pattern: "[" }).ok, false);
+  assert.equal(validateCustomPattern({ name: "employee_id", pattern: ".*" }).ok, false);
+  assert.equal(validateCustomPattern({ name: "employee_id", pattern: "EMP", flags: "g" }).ok, false);
+  assert.equal(validateCustomPattern({ name: "employee_id", pattern: "x".repeat(201) }).ok, false);
+  assert.deepEqual(validateCustomPattern({ name: "employee_id", pattern: "EMP-\\d{6}", flags: "i" }), {
+    ok: true,
+    value: { name: "employee_id", source: "EMP-\\d{6}", flags: "i" },
+  });
+});
+
+test("custom pattern registration requires approval", async () => {
+  const approvedContext = {
+    state: { revision: 0, customPatterns: [], artifact: null, verification: null },
+    callSource: "agent",
+    requestConfirmation: async (message) => {
+      assert.equal(message, 'Agent requested: register custom pattern "employee_id" (EMP-\\d{6})');
+      return true;
+    },
+    onStateChanged() {},
+  };
+  const approved = await registerCustomPattern(approvedContext, {
+    name: "employee_id",
+    pattern: "EMP-\\d{6}",
+  });
+  assert.deepEqual(approved, { status: "success", name: "employee_id", totalPatterns: 1 });
+  assert.equal(approvedContext.state.customPatterns.length, 1);
+
+  const deniedContext = {
+    state: { revision: 0, customPatterns: [], artifact: null, verification: null },
+    callSource: "agent",
+    requestConfirmation: async () => false,
+    onStateChanged() {},
+  };
+  const denied = await registerCustomPattern(deniedContext, {
+    name: "employee_id",
+    pattern: "EMP-\\d{6}",
+  });
+  assert.deepEqual(denied, { status: "denied", message: "User denied the custom pattern request." });
+  assert.equal(deniedContext.state.customPatterns.length, 0);
+});
+
+test("custom pattern findings stay privacy-safe through redaction and verification", async () => {
+  const registry = createFindingRegistry();
+  const document = await loadTextDocument("Employee EMP-123456 and EMP-654321");
+  const state = { artifact: null, verification: null, revision: 0, maskMode: "synthetic_replacement", customPatterns: [] };
+  const context = { document, registry, state, callSource: "user", onFindingsChanged() {}, onVerificationChanged() {}, onStateChanged() {} };
+  const registration = await registerCustomPattern(context, { name: "employee_id", pattern: "EMP-\\d{6}" });
+  assert.equal(registration.status, "success");
+  const scan = await scanDocumentPII(context);
+  assert.equal(scan.totalDetected, 2);
+  assert.equal(scan.findings.every((finding) => finding.type === "custom:employee_id" && !("value" in finding)), true);
+  await applyRedactions(context, { targetIds: registry.all().map((finding) => finding.id), maskMode: "synthetic_replacement" });
+  const artifactText = await state.artifact.blob.text();
+  assert.equal(artifactText.includes("EMP-123456"), false);
+  assert.equal(artifactText.includes("EMP-654321"), false);
+  const verification = await verifyRedaction(context);
+  assert.equal(verification.passed, true);
+  assert.equal(verification.originalValuesFound, 0);
+});
+
 test("tool payload projection never contains planted sensitive values", async () => {
   const planted = "123-45-6789 and jordan@example.com and 4111 1111 1111 1111";
   const registry = createFindingRegistry();
@@ -59,6 +122,11 @@ test("tool payload projection never contains planted sensitive values", async ()
 test("detector validates API and connection shapes", () => {
   const findings = detectCandidates("key sk_live_abc123456 and postgres://u:p@host/db");
   assert.deepEqual(findings.map((finding) => finding.type), ["api_key", "db_connection_string"]);
+});
+
+test("detector skips zero-length custom matches", () => {
+  const findings = detectCandidates("A", ["custom:optional"], undefined, [{ name: "optional", source: "A?", flags: "" }]);
+  assert.deepEqual(findings.map((finding) => finding.length), [1]);
 });
 
 test("verification exposes a count and projected remaining list", async () => {

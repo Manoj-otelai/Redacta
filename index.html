@@ -102,7 +102,7 @@
     <div class="stats">
       <div class="wrap stats-grid">
         <div class="stat"><strong>0</strong><span>bytes of your document uploaded</span></div>
-        <div class="stat"><strong>7</strong><span>WebMCP tools registered</span></div>
+        <div class="stat"><strong>8</strong><span>WebMCP tools registered</span></div>
         <div class="stat"><strong>8</strong><span>detector categories, locally run</span></div>
         <div class="stat"><strong>3</strong><span>independent checks before export</span></div>
       </div>
@@ -240,7 +240,7 @@
     <div class="wrap tools-grid">
       <div>
         <p class="eyebrow">WebMCP surface</p>
-        <h2 class="display">Seven tools. Capabilities, not contents.</h2>
+        <h2 class="display">Eight tools. Capabilities, not contents.</h2>
         <p class="lede">Registered on <code>document.modelContext</code> when native WebMCP is available, with a Demo Mode console when it isn't — the same tools, the same boundary.</p>
         <div class="hero-actions" style="justify-content:flex-start">
           <a class="btn btn-light" href="https://github.com/Manoj-otelai/Redacta">Read the source</a>
@@ -254,6 +254,7 @@
         <div class="tool"><code>verifyRedaction</code><p>Rescans artifact bytes and mask coverage, including original-value absence. <b>Returns pass or fail, per category.</b></p></div>
         <div class="tool"><code>exportSanitizedDocument</code><p>Downloads the sanitized copy. <b>Blocked until verification passes.</b></p></div>
         <div class="tool"><code>getVerificationCertificate</code><p>Returns metadata-only proof for a verified artifact. <b>Never includes document contents or values.</b></p></div>
+        <div class="tool"><code>registerCustomPattern</code><p>Registers a local detector from a validated pattern. <b>Requires human approval; returns counts and locations only.</b></p></div>
       </div>
     </div>
   </section>

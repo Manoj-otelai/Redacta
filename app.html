@@ -127,6 +127,24 @@
                   <option value="synthetic_replacement">Synthetic replacement</option>
                 </select>
               </label>
+              <section class="custom-patterns" aria-labelledby="customPatternsTitle">
+                <div class="custom-patterns-head">
+                  <span id="customPatternsTitle">Custom patterns</span>
+                  <span class="custom-pattern-count mono" id="customPatternCount">0 / 5</span>
+                </div>
+                <p class="custom-pattern-hint">Agents can register extra patterns only with human approval. Patterns run locally.</p>
+                <div class="custom-pattern-list" id="customPatternList">
+                  <div class="custom-pattern-empty">No custom patterns registered.</div>
+                </div>
+                <form class="custom-pattern-form" id="customPatternForm">
+                  <label class="field-label" for="customPatternName">Name</label>
+                  <input id="customPatternName" name="name" type="text" autocomplete="off" />
+                  <label class="field-label" for="customPatternSource">Pattern</label>
+                  <input id="customPatternSource" name="pattern" type="text" autocomplete="off" />
+                  <button class="button button-secondary full" type="submit">Register pattern</button>
+                  <p class="custom-pattern-error" id="customPatternError" role="alert" aria-live="polite"></p>
+                </form>
+              </section>
               <button class="button button-primary full" id="scanButton" type="button">Scan for sensitive data</button>
               <button class="button button-danger full" id="redactButton" type="button" disabled>Apply redactions</button>
               <div class="button-row">

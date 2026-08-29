@@ -1,8 +1,8 @@
 import { detectCandidates } from "./detectors.js";
 
-export function scanText(text, categories, onProgress) {
+export function scanText(text, categories, onProgress, customPatterns = []) {
   if (typeof Worker === "undefined") {
-    return Promise.resolve(detectCandidates(text, categories, onProgress));
+    return Promise.resolve(detectCandidates(text, categories, onProgress, customPatterns));
   }
   return new Promise((resolve, reject) => {
     const worker = new Worker(new URL("./scan.worker.js", import.meta.url), { type: "module" });
@@ -17,6 +17,6 @@ export function scanText(text, categories, onProgress) {
       worker.terminate();
       reject(error);
     };
-    worker.postMessage({ text, categories });
+    worker.postMessage({ text, categories, customPatterns });
   });
 }

@@ -1,7 +1,7 @@
 import { createFindingRegistry } from "./registry.js";
 import { loadTextDocument } from "./textDocument.js";
 import { createDemoPdf, loadPdfDocument } from "./pdfDocument.js";
-import { syntheticReplacement } from "./detectors.js";
+import { MAX_CUSTOM_PATTERNS, syntheticReplacement } from "./detectors.js";
 import { installNetworkMonitor } from "./network.js";
 import {
   applyRedactions,
@@ -10,6 +10,7 @@ import {
   getVerificationCertificate,
   getFindingDetails,
   inspectDocument,
+  registerCustomPattern,
   scanDocumentPII,
   TOOL_DESCRIPTIONS,
   TOOL_SCHEMAS,
@@ -28,8 +29,8 @@ The parties agree to the terms and conditions set forth below.`;
 
 const loadDemoText = async () => loadDocument(await loadTextDocument(new File([demoText], "confidential-employment-contract.txt", { type: "text/plain" })));
 const loadDemoPdf = async () => loadDocument(await loadPdfDocument(await createDemoPdf()));
-const toolMap = { inspectDocument, scanDocumentPII, applyRedactions, verifyRedaction, getFindingDetails, exportSanitizedDocument, getVerificationCertificate };
-const state = { document: null, artifact: null, verification: null, maskMode: "blackout", revision: 0, lastRedactionBatch: [], manualMode: false, pdfPage: 1, zoom: 1 };
+const toolMap = { inspectDocument, scanDocumentPII, applyRedactions, verifyRedaction, getFindingDetails, exportSanitizedDocument, getVerificationCertificate, registerCustomPattern };
+const state = { document: null, artifact: null, verification: null, customPatterns: [], maskMode: "blackout", revision: 0, lastRedactionBatch: [], manualMode: false, pdfPage: 1, zoom: 1 };
 const registry = createFindingRegistry();
 const audit = { calls: 0, leaks: 0 };
 const AGENT_STEPS = [
@@ -537,6 +538,7 @@ function render() {
     }
   }
   renderCategorySummary(findings);
+  renderCustomPatterns();
   renderVerificationSummary();
   renderCertificateCard();
   const pending = findings.filter((finding) => finding.status === "pending");
@@ -566,6 +568,39 @@ function renderCategorySummary(findings) {
     chip.append(TYPE_LABELS[type] ?? type.replaceAll("_", " "), Object.assign(document.createElement("strong"), { textContent: String(count) }));
     return chip;
   }));
+}
+
+function renderCustomPatterns() {
+  const patterns = state.customPatterns;
+  $("customPatternCount").textContent = `${patterns.length} / ${MAX_CUSTOM_PATTERNS}`;
+  const list = $("customPatternList");
+  list.replaceChildren();
+  if (!patterns.length) {
+    const empty = document.createElement("div");
+    empty.className = "custom-pattern-empty";
+    empty.textContent = "No custom patterns registered.";
+    list.append(empty);
+    return;
+  }
+  for (const pattern of patterns) {
+    const row = document.createElement("div");
+    row.className = "custom-pattern-row";
+    const details = document.createElement("div");
+    details.className = "custom-pattern-details";
+    const name = document.createElement("strong");
+    name.textContent = pattern.name;
+    const source = document.createElement("code");
+    source.textContent = pattern.source;
+    details.append(name, source);
+    const remove = document.createElement("button");
+    remove.className = "custom-pattern-remove";
+    remove.type = "button";
+    remove.dataset.patternName = pattern.name;
+    remove.textContent = "Remove";
+    remove.setAttribute("aria-label", `Remove pattern ${pattern.name}`);
+    row.append(details, remove);
+    list.append(row);
+  }
 }
 
 function renderVerificationSummary() {
@@ -821,6 +856,30 @@ async function runVerification() {
   toast(result.passed ? "Verification passed · export unlocked" : "Verification failed · export remains blocked");
 }
 
+async function registerPatternFromForm(event) {
+  event.preventDefault();
+  const error = $("customPatternError");
+  error.textContent = "";
+  const result = await executeTool("registerCustomPattern", {
+    name: $("customPatternName").value,
+    pattern: $("customPatternSource").value,
+  }, "user");
+  if (result.status !== "success") {
+    error.textContent = result.message;
+    return;
+  }
+  $("customPatternForm").reset();
+  if (state.document) await executeTool("scanDocumentPII", {}, "user");
+  toast("Pattern registered \u2014 rescanned locally.");
+}
+
+async function removeCustomPattern(name) {
+  state.customPatterns = state.customPatterns.filter((pattern) => pattern.name !== name);
+  invalidate();
+  if (state.document) await executeTool("scanDocumentPII", {}, "user");
+  toast("Pattern removed \u2014 rescanned locally.");
+}
+
 function registerTools() {
   const execute = (name, input) => executeTool(name, input, "agent");
   if (!document.modelContext?.registerTool) {
@@ -929,6 +988,11 @@ export function initUI() {
     state.maskMode = event.target.value;
     invalidate();
     toast(state.maskMode === "blackout" ? "Masks will be solid blackout bars." : "Masks will use synthetic replacement values.");
+  });
+  $("customPatternForm").addEventListener("submit", registerPatternFromForm);
+  $("customPatternList").addEventListener("click", (event) => {
+    const button = event.target.closest("[data-pattern-name]");
+    if (button) void removeCustomPattern(button.dataset.patternName);
   });
   document.addEventListener("keydown", (event) => {
     if (event.key === "Escape") {
