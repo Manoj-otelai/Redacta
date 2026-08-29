@@ -65,6 +65,7 @@
               <button class="icon-button" id="zoomOut" type="button" title="Zoom out"><svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="9" cy="9" r="5" /><path d="M13 13l4 4M7 9h4" /></svg></button>
               <span class="tool-text" id="zoomLabel">100%</span>
               <button class="icon-button" id="zoomIn" type="button" title="Zoom in"><svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="9" cy="9" r="5" /><path d="M13 13l4 4M7 9h4M9 7v4" /></svg></button>
+              <button class="icon-button" id="zoomFit" type="button" title="Fit page width" disabled><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 6v8M17 6v8M6 10h8M6 10l2-2M6 10l2 2M14 10l-2-2M14 10l-2 2" /></svg><span class="icon-button-text">Fit</span></button>
             </div>
             <div class="tool-divider"></div>
             <div class="tool-group">
@@ -99,6 +100,10 @@
             </header>
             <div class="task-scroll">
               <p class="task-hint">Findings are detected locally. The agent receives categories, locations and confidence — never the values.</p>
+              <div class="scan-progress" id="scanProgress" hidden>
+                <div class="scan-progress-head">Scanning locally <strong id="scanPercent">0%</strong></div>
+                <div class="scan-track"><span id="scanBar"></span></div>
+              </div>
               <div class="category-summary" id="categorySummary" hidden></div>
               <div class="list-toolbar" id="listToolbar" hidden>
                 <span id="selectionCount">0 selected</span>
@@ -135,6 +140,11 @@
               <p class="task-hint">Every WebMCP tool call is logged with privacy-safe argument and result summaries.</p>
               <div class="activity-log" id="activityLog">
                 <div class="activity-item muted"><span class="activity-check">○</span><div><strong>Waiting for agent</strong><p>WebMCP tools are registered and ready to be called</p></div></div>
+              </div>
+              <div class="prompt-card">
+                <p class="tiny-label">Try this with your agent</p>
+                <code id="demoPrompt">Inspect this document, scan it for SSNs, credit cards, emails and API keys, redact every finding, verify the sanitized copy, then export it.</code>
+                <button class="button button-secondary full" id="copyPrompt" type="button">Copy prompt</button>
               </div>
             </div>
           </section>

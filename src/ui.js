@@ -51,7 +51,10 @@ const context = {
   registry,
   get document() { return state.document; },
   callSource: "user",
-  onProgress(value) { $("processingBadge").textContent = `SCANNING ${value}%`; },
+  onProgress(value) {
+    $("processingBadge").textContent = `SCANNING ${value}%`;
+    setScanProgress(value);
+  },
   onFindingsChanged: render,
   onVerificationChanged: render,
   onStateChanged: render,
@@ -230,10 +233,48 @@ function selectionPointToOffset(root, node, offset) {
   return 0;
 }
 
+function setScanProgress(value) {
+  const wrap = $("scanProgress");
+  wrap.hidden = value === null;
+  if (value === null) return;
+  $("scanBar").style.width = `${value}%`;
+  $("scanPercent").textContent = `${value}%`;
+}
+
+function clearLocator() {
+  for (const box of $("documentPreview").querySelectorAll(".locate-box")) box.remove();
+  for (const mark of $("documentPreview").querySelectorAll("mark.is-located")) mark.classList.remove("is-located");
+}
+
+function locateFinding(findingId) {
+  clearLocator();
+  const finding = registry.all().find((item) => item.id === findingId);
+  if (!finding || !state.document) return;
+  if (state.document.kind !== "pdf") {
+    $("documentPreview").querySelector(`mark[data-start="${finding.charStart}"]`)?.classList.add("is-located");
+    return;
+  }
+  const page = state.document.pages[state.pdfPage - 1];
+  const overlay = $("documentPreview").querySelector(".pdf-overlay");
+  if (!overlay || !page || !finding.boundingBox || finding.page !== state.pdfPage) return;
+  const box = document.createElement("span");
+  box.className = "locate-box";
+  box.style.left = `${(finding.boundingBox.x / page.width) * 100}%`;
+  box.style.top = `${(finding.boundingBox.y / page.height) * 100}%`;
+  box.style.width = `${(finding.boundingBox.width / page.width) * 100}%`;
+  box.style.height = `${(finding.boundingBox.height / page.height) * 100}%`;
+  overlay.append(box);
+}
+
 function createPdfCanvas(preview) {
+  const frame = document.createElement("div");
+  frame.className = "pdf-frame";
   const canvas = document.createElement("canvas");
   canvas.className = "pdf-preview";
-  preview.replaceChildren(canvas);
+  const overlay = document.createElement("div");
+  overlay.className = "pdf-overlay";
+  frame.append(canvas, overlay);
+  preview.replaceChildren(frame);
   let start = null;
   canvas.onpointerdown = (event) => { if (state.manualMode) start = [event.offsetX, event.offsetY]; };
   canvas.onpointerup = (event) => {
@@ -277,6 +318,7 @@ function renderViewerChrome() {
   $("zoomLabel").textContent = `${Math.round(state.zoom * 100)}%`;
   $("zoomIn").disabled = state.zoom >= ZOOM_STEPS.at(-1);
   $("zoomOut").disabled = state.zoom <= ZOOM_STEPS[0];
+  $("zoomFit").disabled = state.document?.kind !== "pdf";
   $("documentPreview").style.setProperty("--doc-zoom", state.zoom);
   $("documentPreview").classList.toggle("is-marking", state.manualMode);
   $("manualButton").classList.toggle("is-active", state.manualMode);
@@ -385,7 +427,7 @@ function render() {
       row.className = `finding${finding.status === "redacted" ? " redacted" : ""}${finding.status === "excluded" ? " excluded" : ""}`;
       row.dataset.findingId = finding.id;
       row.dataset.page = finding.page || 1;
-      row.innerHTML = `<input type="checkbox" data-id="${finding.id}" aria-label="Include ${finding.id} in the next redaction" ${finding.status === "redacted" ? "disabled" : ""} ${finding.status === "excluded" ? "" : "checked"} /><span class="finding-dot"></span><span class="finding-info"><strong>${escapeHtml(TYPE_LABELS[finding.type] ?? finding.type.replaceAll("_", " "))}</strong><small>${finding.id} · ${escapeHtml(finding.location || "local")}</small></span><span class="confidence">${finding.confidence.toFixed(2)}</span><span class="finding-actions"><span class="finding-tag">${finding.status}</span>${finding.status === "redacted" ? `<button class="finding-control" data-action="restore" data-id="${finding.id}">Restore</button>` : ""}</span>`;
+      row.innerHTML = `<input type="checkbox" data-id="${finding.id}" aria-label="Include ${finding.id} in the next redaction" ${finding.status === "redacted" ? "disabled" : ""} ${finding.status === "excluded" ? "" : "checked"} /><span class="finding-dot"></span><span class="finding-info"><strong>${escapeHtml(TYPE_LABELS[finding.type] ?? finding.type.replaceAll("_", " "))}</strong><small>${finding.id} · ${escapeHtml(finding.location || "local")}</small></span><span class="confidence">${finding.confidence.toFixed(2)}</span><span class="finding-actions">${finding.status === "pending" ? "" : `<span class="finding-tag">${finding.status}</span>`}${finding.status === "redacted" ? `<button class="finding-control" data-action="restore" data-id="${finding.id}">Restore</button>` : ""}</span>`;
       list.append(row);
     }
   }
@@ -445,6 +487,18 @@ function goToPage(pageNumber) {
   renderPreview();
 }
 
+function fitToWidth() {
+  const page = state.document?.kind === "pdf" ? state.document.pages[state.pdfPage - 1] : null;
+  if (!page) return;
+  const stage = document.querySelector(".viewer-stage");
+  const available = stage.clientWidth - 52;
+  const baseScale = Math.min(1, 720 / page.width);
+  const zoom = available / (page.width * baseScale);
+  state.zoom = Math.round(Math.max(ZOOM_STEPS[0], Math.min(ZOOM_STEPS.at(-1), zoom)) * 100) / 100;
+  renderViewerChrome();
+  renderPreview();
+}
+
 function stepZoom(direction) {
   const index = ZOOM_STEPS.findIndex((step) => step >= state.zoom - 0.001);
   const next = ZOOM_STEPS[Math.max(0, Math.min(ZOOM_STEPS.length - 1, (index < 0 ? ZOOM_STEPS.length - 1 : index) + direction))];
@@ -494,7 +548,9 @@ async function runScan() {
   if (!state.document) return toast("Load a document first.");
   const inspected = await executeTool("inspectDocument", {}, "user");
   if (inspected.status !== "success") return toast("Could not inspect this document.");
+  setScanProgress(0);
   const result = await executeTool("scanDocumentPII", {}, "user");
+  setScanProgress(null);
   if (result.status !== "success") toast("Scan failed. No redaction or export was performed.");
   else toast(`${result.totalDetected} findings detected · values withheld`);
 }
@@ -556,6 +612,7 @@ export function initUI() {
   $("pageInput").addEventListener("change", (event) => goToPage(Number(event.target.value)));
   $("zoomIn").addEventListener("click", () => stepZoom(1));
   $("zoomOut").addEventListener("click", () => stepZoom(-1));
+  $("zoomFit").addEventListener("click", fitToWidth);
   $("thumbList").addEventListener("click", (event) => {
     const thumb = event.target.closest(".thumb");
     if (thumb) goToPage(Number(thumb.dataset.page));
@@ -590,6 +647,23 @@ export function initUI() {
     }
     const row = event.target.closest(".finding");
     if (row && !event.target.matches("input")) goToPage(Number(row.dataset.page));
+  });
+  $("findingList").addEventListener("mouseover", (event) => {
+    const row = event.target.closest(".finding");
+    if (row) locateFinding(row.dataset.findingId);
+  });
+  $("findingList").addEventListener("focusin", (event) => {
+    const row = event.target.closest(".finding");
+    if (row) locateFinding(row.dataset.findingId);
+  });
+  $("findingList").addEventListener("mouseleave", clearLocator);
+  $("copyPrompt").addEventListener("click", async () => {
+    try {
+      await navigator.clipboard.writeText($("demoPrompt").textContent.trim());
+      toast("Demo prompt copied to the clipboard.");
+    } catch {
+      toast("Copying is blocked here — select the prompt text instead.");
+    }
   });
   $("selectAll").addEventListener("click", () => {
     registry.restore(registry.all().filter((finding) => finding.status === "excluded").map((finding) => finding.id));
