@@ -2,8 +2,7 @@ import { detectCandidates } from "./detectors.js";
 
 export function scanText(text, categories, onProgress) {
   if (typeof Worker === "undefined") {
-    onProgress?.(100);
-    return Promise.resolve(detectCandidates(text, categories));
+    return Promise.resolve(detectCandidates(text, categories, onProgress));
   }
   return new Promise((resolve, reject) => {
     const worker = new Worker(new URL("./scan.worker.js", import.meta.url), { type: "module" });

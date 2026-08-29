@@ -1,7 +1,7 @@
 {
-  "name": "test-repo",
+  "name": "privacyvault",
   "version": "1.0.0",
-  "description": "PrivacyVault is a static, browser-local document privacy workspace for the WebMCP Challenge. It demonstrates how an AI agent can inspect, scan, redact, verify, and export a document through privacy-safe tools without receiving the document contents.",
+  "description": "Browser-local, privacy-safe document scanning and redaction workspace.",
   "main": "src/app.js",
   "directories": {
     "test": "test"

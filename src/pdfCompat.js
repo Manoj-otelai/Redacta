@@ -1,3 +1,4 @@
+// pdf.js 6 uses Iterator.join, Uint8Array encoding helpers, and Map upsert helpers.
 if (typeof globalThis.Iterator !== "function") {
   globalThis.Iterator = function Iterator() {};
   globalThis.Iterator.prototype = {};

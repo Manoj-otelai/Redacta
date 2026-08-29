@@ -11,6 +11,7 @@ async function loadEngines() {
 export async function loadPdfDocument(file) {
   await loadEngines();
   const bytes = new Uint8Array(await file.arrayBuffer());
+  const size = bytes.byteLength;
   const pdf = await pdfjsLib.getDocument({ data: bytes }).promise;
   const pages = [];
   let text = "";
@@ -18,36 +19,89 @@ export async function loadPdfDocument(file) {
     const page = await pdf.getPage(pageNumber);
     const viewport = page.getViewport({ scale: 1 });
     const content = await page.getTextContent();
-    let pageText = "";
-    const items = content.items.map((item) => {
-      const start = pageText.length;
-      pageText += `${item.str}\n`;
-      return { start, end: pageText.length - 1, item };
-    });
+    const reconstructed = reconstructPageText(content.items);
+    const pageText = reconstructed.text;
+    const items = reconstructed.items;
     const pageStart = text.length;
     text += pageText;
     pages.push({ page, pageNumber, width: viewport.width, height: viewport.height, text: pageText, items, start: pageStart });
   }
-  return { kind: "pdf", name: file.name, type: "application/pdf", size: bytes.byteLength, pageCount: pdf.numPages, bytes, text, pages, pdf };
+  return { kind: "pdf", format: "pdf", name: file.name, type: "application/pdf", size, sizeLabel: formatBytes(size), pageCount: pdf.numPages, bytes, text, pages, pdf };
 }
 
 export function locatePdfFinding(document, candidate) {
   const pageInfo = document.pages.find((page) => candidate.offset >= page.start && candidate.offset < page.start + page.text.length)
     ?? document.pages[document.pages.length - 1];
   const localStart = Math.max(0, candidate.offset - pageInfo.start);
-  const itemInfo = pageInfo.items.find((entry) => localStart >= entry.start && localStart <= entry.end) ?? pageInfo.items[0];
+  const overlaps = pageInfo.items.filter((entry) => entry.start < localStart + candidate.length && entry.end > localStart);
+  const itemInfo = overlaps[0] ?? pageInfo.items[0];
   if (!itemInfo) return { page: pageInfo.pageNumber, location: `page ${pageInfo.pageNumber}`, boundingBox: null };
-  const { item } = itemInfo;
-  const charsBefore = Math.max(0, localStart - itemInfo.start);
-  const ratio = item.str.length ? charsBefore / item.str.length : 0;
-  const fontSize = Math.abs(item.transform?.[3] || 12);
-  const x = (item.transform?.[4] || 0) + (item.width || fontSize * item.str.length * 0.5) * ratio;
-  const y = pageInfo.height - (item.transform?.[5] || fontSize) - fontSize;
+  const boxes = (overlaps.length ? overlaps : [itemInfo]).map(({ item }) => itemBox(item, pageInfo.height));
+  const x = Math.min(...boxes.map((box) => box.x));
+  const y = Math.min(...boxes.map((box) => box.y));
+  const right = Math.max(...boxes.map((box) => box.x + box.width));
+  const bottom = Math.max(...boxes.map((box) => box.y + box.height));
   return {
     page: pageInfo.pageNumber,
     location: `page ${pageInfo.pageNumber}, x ${Math.round(x)}, y ${Math.round(y)}`,
-    boundingBox: { x, y, width: Math.max(fontSize * 2, (item.width || fontSize * candidate.length * 0.5) * candidate.length / Math.max(1, item.str.length)), height: fontSize * 1.2 },
+    boundingBox: { x, y, width: right - x, height: bottom - y },
   };
+}
+
+export function reconstructPageText(items) {
+  const positioned = items.map((item, index) => ({
+    item,
+    index,
+    x: item.transform?.[4] || 0,
+    y: item.transform?.[5] || 0,
+    height: Math.abs(item.transform?.[3] || item.height || 12),
+  }));
+  const lines = [];
+  for (const entry of positioned) {
+    let line = lines.find((candidate) => Math.abs(candidate.y - entry.y) <= Math.max(3, entry.height * 0.45));
+    if (!line) {
+      line = { y: entry.y, items: [] };
+      lines.push(line);
+    }
+    line.items.push(entry);
+  }
+  lines.sort((left, right) => right.y - left.y);
+  const result = [];
+  const mapped = [];
+  let offset = 0;
+  for (const [lineIndex, line] of lines.entries()) {
+    line.items.sort((left, right) => left.x - right.x || left.index - right.index);
+    if (lineIndex) {
+      result.push("\n");
+      offset += 1;
+    }
+    for (const [itemIndex, entry] of line.items.entries()) {
+      const previous = line.items[itemIndex - 1];
+      const gap = previous ? entry.x - (previous.x + (previous.item.width || 0)) : 0;
+      if (previous && gap > Math.max(2, entry.height * 0.2)) {
+        result.push(" ");
+        offset += 1;
+      }
+      const start = offset;
+      result.push(entry.item.str);
+      offset += entry.item.str.length;
+      mapped.push({ start, end: offset, item: entry.item });
+    }
+  }
+  return { text: `${result.join("")}\n`, items: mapped };
+}
+
+function itemBox(item, pageHeight) {
+  const fontSize = Math.abs(item.transform?.[3] || item.height || 12);
+  const x = (item.transform?.[4] || 0) - 2;
+  const y = pageHeight - (item.transform?.[5] || fontSize) - fontSize - 2;
+  return { x, y, width: (item.width || fontSize * Math.max(1, item.str.length) * 0.5) + 4, height: fontSize * 1.2 + 4 };
+}
+
+function formatBytes(size) {
+  if (size < 1024) return `${size}B`;
+  if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)}KB`;
+  return `${(size / (1024 * 1024)).toFixed(1)}MB`;
 }
 
 export async function rasterizePdf(pdfDocument, registry, maskMode = "blackout") {
@@ -89,17 +143,43 @@ export async function rasterizePdf(pdfDocument, registry, maskMode = "blackout")
 export async function createDemoPdf() {
   await loadEngines();
   const output = await PDFDocument.create();
-  const page = output.addPage([612, 792]);
   const font = await output.embedFont("Helvetica");
-  const lines = [
-    "CONFIDENTIAL - PRIVACYVAULT DEMO",
-    "Employment Agreement",
-    "Employee identification: 123-45-6789",
-    "Contact: jordan.lee@northstar.example  (415) 555-0198",
-    "Payroll card: 4111 1111 1111 1111",
-    "Integration key: sk_live_51NORTHSTAR_8df7a",
+  const pages = [
+    [
+      "CONFIDENTIAL - PRIVACYVAULT DEMO / PAGE 1",
+      "Employment Agreement - Northstar Labs",
+      "Employee SSN: 123-45-6789",
+      "Benefits contact: jordan.one@northstar.example",
+      "Payroll card: 4111 1111 1111 1111",
+      "Integration key: sk_live_NORTHSTAR_01ab23cd",
+    ],
+    [
+      "CONFIDENTIAL - PRIVACYVAULT DEMO / PAGE 2",
+      "Employee SSN: 234-56-7890",
+      "Benefits contact: jordan.two@northstar.example",
+      "Payroll card: 4242 4242 4242 4242",
+      "Integration key: sk_test_NORTHSTAR_02ef45gh",
+    ],
+    [
+      "CONFIDENTIAL - PRIVACYVAULT DEMO / PAGE 3",
+      "Employee SSN: 345-67-8901",
+      "Employee SSN: 456-78-9012",
+      "Benefits contact: jordan.three@northstar.example",
+      "Payroll card: 5555 5555 5555 4444",
+      "HR contact: payroll@northstar.example",
+    ],
+    [
+      "CONFIDENTIAL - PRIVACYVAULT DEMO / PAGE 4",
+      "Employee SSN: 567-89-0123",
+      "Employee SSN: 678-90-1234",
+      "Employee SSN: 789-01-2345",
+      "HR contact: security@northstar.example",
+    ],
   ];
-  lines.forEach((line, index) => page.drawText(line, { x: 54, y: 720 - index * 42, size: 16, font }));
+  for (const lines of pages) {
+    const page = output.addPage([612, 792]);
+    lines.forEach((line, index) => page.drawText(line, { x: 54, y: 720 - index * 42, size: 16, font }));
+  }
   return new File([await output.save()], "confidential-employment-contract.pdf", { type: "application/pdf" });
 }
 

@@ -2,15 +2,26 @@ import { syntheticReplacement } from "./detectors.js";
 
 export async function loadTextDocument(file) {
   const text = typeof file === "string" ? file : await file.text();
+  const name = file?.name ?? "document.txt";
+  const format = name.toLowerCase().match(/\.(txt|json|csv)$/)?.[1] ?? "txt";
+  const size = new TextEncoder().encode(text).byteLength;
   return {
     kind: "text",
-    name: file?.name ?? "document.txt",
+    format,
+    name,
     type: file?.type || "text/plain",
-    size: new TextEncoder().encode(text).byteLength,
+    size,
+    sizeLabel: formatBytes(size),
     pageCount: 1,
     text,
     bytes: new TextEncoder().encode(text),
   };
+}
+
+function formatBytes(size) {
+  if (size < 1024) return `${size}B`;
+  if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)}KB`;
+  return `${(size / (1024 * 1024)).toFixed(1)}MB`;
 }
 
 export function createTextArtifact(document, registry, maskMode = "blackout") {

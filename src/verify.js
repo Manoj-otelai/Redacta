@@ -11,7 +11,8 @@ export async function verifyArtifact(artifact, categories, project) {
   return {
     status: remaining.length ? "failed" : "verified",
     passed: remaining.length === 0,
-    remainingFindings: remaining,
+    remainingFindings: remaining.length,
+    remaining,
     categories: Object.fromEntries(categoryNames.map((type) => [type, remaining.filter((finding) => finding.type === type).length])),
   };
 }

@@ -15,11 +15,11 @@ export const DETECTOR_DEFINITIONS = [
 const priority = new Map(DETECTOR_DEFINITIONS.map((item, index) => [item.type, index]));
 export const detectorTypes = DETECTOR_DEFINITIONS.map(({ type }) => type);
 
-export function detectCandidates(text, categories = detectorTypes) {
+export function detectCandidates(text, categories = detectorTypes, onProgress) {
   const allowed = new Set(categories);
   const candidates = [];
-  for (const definition of DETECTOR_DEFINITIONS) {
-    if (!allowed.has(definition.type)) continue;
+  const definitions = DETECTOR_DEFINITIONS.filter((definition) => allowed.has(definition.type));
+  for (const [definitionIndex, definition] of definitions.entries()) {
     definition.regex.lastIndex = 0;
     let match;
     while ((match = definition.regex.exec(text))) {
@@ -37,6 +37,7 @@ export function detectCandidates(text, categories = detectorTypes) {
         validated,
       });
     }
+    onProgress?.(Math.round(((definitionIndex + 1) / Math.max(1, definitions.length)) * 100));
   }
   candidates.sort((left, right) => left.offset - right.offset || priority.get(left.type) - priority.get(right.type));
   return candidates.filter((candidate, index, all) => !all.some((other, otherIndex) => {

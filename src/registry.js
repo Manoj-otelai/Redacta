@@ -26,11 +26,33 @@ export function createFindingRegistry() {
       for (const record of records.values()) if (!selected || selected.has(record.id)) record.status = "redacted";
     },
     exclude(ids) {
-      for (const record of records.values()) if (ids.includes(record.id)) record.status = "excluded";
+      for (const record of records.values()) if (ids.includes(record.id) && record.status !== "redacted") record.status = "excluded";
+    },
+    restore(ids) {
+      const selected = ids ? new Set(ids) : null;
+      for (const record of records.values()) if (!selected || selected.has(record.id)) record.status = "pending";
+    },
+    addManual(finding) {
+      sequence += 1;
+      const id = `finding_${String(sequence).padStart(3, "0")}`;
+      const record = {
+        ...finding,
+        id,
+        type: "manual",
+        confidence: 1,
+        status: "pending",
+        origin: "manual",
+        offset: finding.offset ?? finding.charStart,
+        length: finding.length ?? ((finding.charEnd ?? finding.charStart) - finding.charStart),
+        value: finding.value ?? "",
+      };
+      records.set(id, record);
+      return record;
     },
     project(record) { return record ? project(record) : null; },
     projectAll() { return [...records.values()].map(project); },
     rawValue(id) { return records.get(id)?.value; },
     active() { return [...records.values()].filter((record) => record.status === "redacted"); },
+    selected() { return [...records.values()].filter((record) => record.status !== "excluded"); },
   };
 }

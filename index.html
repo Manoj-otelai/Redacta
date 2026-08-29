@@ -74,7 +74,8 @@
           <div class="privacy-card">
             <div class="privacy-title"><span class="lock">◆</span><span>PRIVACY BOUNDARY</span><span class="shield">✓</span></div>
             <div class="privacy-row"><span>Original file</span><strong>LOCAL</strong></div>
-            <div class="privacy-row"><span>Network uploads</span><strong>0</strong></div>
+            <div class="privacy-row"><span>Network uploads</span><strong id="networkUploads">0</strong></div>
+            <div class="verification-message" id="verificationMessage" role="alert"></div>
             <div class="privacy-divider"></div>
             <p class="tiny-label">AGENT CAN SEE</p>
             <ul class="safe-list"><li>Finding counts</li><li>Categories & locations</li><li>Verification status</li></ul>
@@ -87,6 +88,8 @@
             <div class="finding-list" id="findingList"><div class="empty-state">Run a local scan to see<br />privacy-safe findings.</div></div>
             <div class="inspector-actions">
               <button class="button button-primary full" id="redactButton" disabled>Redact selected <span>→</span></button>
+              <button class="button button-ghost full" id="manualButton">Manual redaction</button>
+              <button class="button button-ghost full" id="undoButton" disabled>Undo last redaction</button>
               <button class="button button-ghost full" id="verifyButton" disabled>Verify sanitized copy</button>
               <button class="button button-ghost full" id="exportButton" disabled>Export verified copy</button>
             </div>
@@ -101,14 +104,33 @@
         </div>
       </section>
 
+      <section class="developer-panel">
+        <button class="button button-ghost" id="developerToggle">Developer panel</button>
+        <div id="developerPanel" hidden>
+          <label for="developerTool">Tool</label>
+          <select id="developerTool"></select>
+          <label for="developerArgs">JSON arguments</label>
+          <textarea id="developerArgs">{}</textarea>
+          <button class="button button-primary" id="developerRun">Invoke tool</button>
+          <pre id="developerResult" aria-live="polite"></pre>
+        </div>
+      </section>
+
       <section class="bottom-proof">
-        <div><span class="big-stat">0</span><span>document uploads<br /><small>NETWORK REQUESTS</small></span></div>
+        <div><span class="big-stat" id="bottomUploadCount">0</span><span>document uploads<br /><small>NETWORK REQUESTS</small></span></div>
         <div><span class="big-stat">100%</span><span>local processing<br /><small>YOUR BROWSER</small></span></div>
         <div><span class="big-stat" id="verifiedStat">—</span><span>verified export<br /><small>NOT UNTIL PROVEN</small></span></div>
         <div class="quote">“The agent knows there are seven SSNs.<br /><em>It never knows what they are.</em>”</div>
       </section>
     </main>
     <div class="toast" id="toast" role="status"></div>
+    <div class="permission-modal" id="permissionModal" hidden>
+      <div class="permission-dialog" role="dialog" aria-modal="true" aria-labelledby="permissionTitle">
+        <h2 id="permissionTitle">Agent request</h2>
+        <p id="permissionMessage"></p>
+        <div><button class="button button-primary" id="permissionAllow">Allow</button><button class="button button-ghost" id="permissionCancel">Cancel</button></div>
+      </div>
+    </div>
     <script type="module" src="src/app.js"></script>
   </body>
 </html>

@@ -15,7 +15,8 @@ for (const [source, destination] of copies) {
   await mkdir(dirname(target), { recursive: true });
   await cp(resolve(root, source), target);
 }
-const compatibility = `if (typeof globalThis.Iterator !== "function") { globalThis.Iterator = function Iterator() {}; globalThis.Iterator.prototype = {}; }\nif (typeof Uint8Array.prototype.toHex !== "function") { Uint8Array.prototype.toHex = function toHex() { return Array.from(this, (byte) => byte.toString(16).padStart(2, "0")).join(""); }; }\nif (typeof Uint8Array.prototype.toBase64 !== "function") { Uint8Array.prototype.toBase64 = function toBase64() { let binary = ""; for (const byte of this) binary += String.fromCharCode(byte); return btoa(binary); }; }\nif (typeof Map.prototype.getOrInsertComputed !== "function") { Map.prototype.getOrInsertComputed = function getOrInsertComputed(key, callback) { if (!this.has(key)) this.set(key, callback(key)); return this.get(key); }; }\nif (typeof Map.prototype.getOrInsert !== "function") { Map.prototype.getOrInsert = function getOrInsert(key, value) { if (!this.has(key)) this.set(key, value); return this.get(key); }; }\n`;
+// Shim built-ins missing from the supported browser/Node runtime before pdf.js executes.
+const compatibility = await readFile(resolve(root, "src/pdfCompat.js"), "utf8");
 for (const destination of ["vendor/pdfjs/pdf.mjs", "vendor/pdfjs/pdf.worker.mjs"]) {
   const target = resolve(root, destination);
   await writeFile(target, compatibility + await readFile(target, "utf8"));
