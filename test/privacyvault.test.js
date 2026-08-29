@@ -5,7 +5,7 @@ import { confidenceScore } from "../src/scoring.js";
 import { detectCandidates } from "../src/detectors.js";
 import { createFindingRegistry } from "../src/registry.js";
 import { loadTextDocument, createTextArtifact } from "../src/textDocument.js";
-import { applyRedactions, scanDocumentPII, verifyRedaction } from "../src/tools.js";
+import { applyRedactions, exportSanitizedDocument, scanDocumentPII, verifyRedaction } from "../src/tools.js";
 import { reconstructPageText } from "../src/pdfDocument.js";
 
 test("Luhn accepts valid cards and rejects invalid cards", () => {
@@ -37,8 +37,10 @@ test("tool payload projection never contains planted sensitive values", async ()
   assert.equal(result.findings.every((finding) => !("value" in finding)), true);
   const activity = JSON.stringify({ args: { targetIds: result.findings.map((finding) => finding.id) }, result });
   assert.equal(activity.includes("123-45-6789"), false);
-  assert.throws(() => { throw new Error("The local operation failed."); }, /local operation failed/);
-  assert.equal("123-45-6789".includes("The local operation failed."), false);
+  const failure = await applyRedactions({ document: null, registry, state: {}, onStateChanged() {} }, { targetIds: [] });
+  assert.equal(failure.status, "error");
+  assert.equal(failure.message.includes("123-45-6789"), false);
+  assert.equal(failure.message.includes("jordan@example.com"), false);
 });
 
 test("detector validates API and connection shapes", () => {
@@ -69,13 +71,30 @@ test("verification blocks a tampered generated artifact", async () => {
   context.state.artifact.blob = new Blob(["tampered"], { type: "text/plain" });
   const result = await verifyRedaction(context);
   assert.equal(result.passed, false);
-  assert.equal(result.remainingFindings, 1);
+  assert.equal(result.remainingFindings, 0);
+  assert.equal(result.integrityFailure, true);
+});
+
+test("export blocks an artifact changed after verification", async () => {
+  const registry = createFindingRegistry();
+  const document = await loadTextDocument("SSN 123-45-6789");
+  const state = { artifact: null, verification: null, revision: 0, maskMode: "blackout" };
+  const context = { document, registry, state, onVerificationChanged() {}, onStateChanged() {}, downloadArtifact() {} };
+  await scanDocumentPII(context);
+  await applyRedactions(context, { targetIds: registry.all().map((finding) => finding.id) });
+  const verification = await verifyRedaction(context);
+  assert.equal(verification.passed, true);
+  context.state.artifact.blob = new Blob(["changed"], { type: "text/plain" });
+  const result = await exportSanitizedDocument(context, { filename: "changed.txt" });
+  assert.equal(result.status, "blocked");
+  assert.equal(result.integrityFailure, true);
 });
 
 test("manual findings participate in text artifact masking", async () => {
   const registry = createFindingRegistry();
   const document = await loadTextDocument("ordinary local note");
-  const manual = registry.addManual({ page: 1, location: "manual text selection", charStart: 0, charEnd: 8, value: "ordinary" });
+  const manual = registry.addManual({ type: "manual_phrase", page: 1, location: "manual text selection", charStart: 0, charEnd: 8, value: "ordinary" });
+  assert.equal(manual.type, "manual_phrase");
   registry.markRedacted([manual.id]);
   const artifact = createTextArtifact(document, registry);
   const output = await artifact.text();

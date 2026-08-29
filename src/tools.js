@@ -83,10 +83,11 @@ export async function verifyRedaction(context, { categories } = {}) {
       const result = {
         status: "failed",
         passed: false,
-        remainingFindings: 1,
+        remainingFindings: 0,
         remaining: [],
         categories: Object.fromEntries(categoryNames.map((type) => [type, 0])),
         message: "Generated artifact integrity check failed.",
+        integrityFailure: true,
       };
       context.state.verification = result;
       context.onVerificationChanged?.(result);
@@ -95,6 +96,7 @@ export async function verifyRedaction(context, { categories } = {}) {
   }
   const result = await verifyArtifact(context.state.artifact, categories ?? detectorTypes, context.registry.project);
   result.remainingFindings = result.remaining.length;
+  result.artifactDigest = context.state.artifact.digest;
   context.state.verification = result;
   context.onVerificationChanged?.(result);
   return result;
@@ -106,12 +108,15 @@ export async function getFindingDetails(context, { findingId } = {}) {
 }
 
 export async function exportSanitizedDocument(context, { filename } = {}) {
+  if (!context.state.verification?.passed) return { status: "blocked", verified: false, message: "Verification must pass before export." };
+  const artifact = context.state.artifact;
+  if (!artifact?.blob || (context.state.verification.artifactDigest && await digestBlob(artifact.blob) !== context.state.verification.artifactDigest)) {
+    return { status: "blocked", verified: false, integrityFailure: true, message: "Generated artifact integrity check failed." };
+  }
   if (context.callSource === "agent" && context.requestConfirmation) {
     const allowed = await context.requestConfirmation("Agent requested: Export the verified sanitized document");
     if (!allowed) return { status: "denied", verified: false, message: "User denied the export request." };
   }
-  if (!context.state.verification?.passed) return { status: "blocked", verified: false, message: "Verification must pass before export." };
-  const artifact = context.state.artifact;
   const outputName = filename || `privacyvault-sanitized.${context.document.kind === "pdf" ? "pdf" : "txt"}`;
   context.downloadArtifact?.(artifact.blob, outputName);
   return { status: "success", filename: outputName, size: artifact.blob.size, verified: true };

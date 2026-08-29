@@ -35,15 +35,22 @@ export function createFindingRegistry() {
     addManual(finding) {
       sequence += 1;
       const id = `finding_${String(sequence).padStart(3, "0")}`;
+      const start = Number.isInteger(finding.charStart) ? finding.charStart : undefined;
+      const end = Number.isInteger(finding.charEnd) ? finding.charEnd : undefined;
+      const length = Number.isInteger(finding.length) && finding.length > 0
+        ? finding.length
+        : start !== undefined && end !== undefined && end > start ? end - start : undefined;
       const record = {
         ...finding,
         id,
-        type: "manual",
+        type: finding.type || "manual",
         confidence: 1,
         status: "pending",
         origin: "manual",
-        offset: finding.offset ?? finding.charStart,
-        length: finding.length ?? ((finding.charEnd ?? finding.charStart) - finding.charStart),
+        ...(start === undefined ? {} : { charStart: start }),
+        ...(end === undefined ? {} : { charEnd: end }),
+        ...(start === undefined ? {} : { offset: finding.offset ?? start }),
+        ...(length === undefined ? {} : { length }),
         value: finding.value ?? "",
       };
       records.set(id, record);

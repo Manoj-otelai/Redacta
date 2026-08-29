@@ -26,7 +26,9 @@ function formatBytes(size) {
 
 export function createTextArtifact(document, registry, maskMode = "blackout") {
   let output = document.text;
-  for (const finding of registry.active().sort((left, right) => right.offset - left.offset)) {
+  for (const finding of registry.active()
+    .filter((finding) => Number.isInteger(finding.offset) && Number.isInteger(finding.length) && finding.length > 0)
+    .sort((left, right) => right.offset - left.offset)) {
     const replacement = maskMode === "synthetic_replacement"
       ? syntheticReplacement(finding.type, finding.value)
       : "█".repeat(Math.max(4, finding.value.length));
