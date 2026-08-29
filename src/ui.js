@@ -219,16 +219,27 @@ async function executeTool(name, args = {}, source = "user") {
 function requestConfirmation(message) {
   return new Promise((resolve) => {
     const modal = $("permissionModal");
+    const returnFocus = document.activeElement;
     $("permissionMessage").textContent = message;
     modal.hidden = false;
+    $("permissionCancel").focus();
     let settled = false;
     const finish = (allowed) => {
       if (settled) return;
       settled = true;
       modal.hidden = true;
+      modal.removeEventListener("keydown", trapFocus);
+      if (returnFocus instanceof HTMLElement) returnFocus.focus();
       clearTimeout(timeout);
       resolve(allowed);
     };
+    const trapFocus = (event) => {
+      if (event.key !== "Tab") return;
+      event.preventDefault();
+      const target = document.activeElement === $("permissionAllow") ? $("permissionCancel") : $("permissionAllow");
+      target.focus();
+    };
+    modal.addEventListener("keydown", trapFocus);
     const timeout = setTimeout(() => finish(false), 60000);
     $("permissionAllow").onclick = () => finish(true);
     $("permissionCancel").onclick = () => finish(false);
