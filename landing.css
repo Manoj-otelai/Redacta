@@ -131,23 +131,36 @@ img { display: block; max-width: 100%; }
 .brand {
   display: flex;
   align-items: center;
-  gap: 9px;
-  font-size: 17px;
-  font-weight: 600;
-  letter-spacing: -.01em;
   text-decoration: none;
 }
-.brand-mark {
-  display: grid;
-  place-items: center;
-  width: 26px;
-  height: 26px;
-  border-radius: 5px;
-  background: linear-gradient(140deg, var(--iris-2), var(--teal));
-  color: #fff;
-  font-family: var(--serif);
-  font-size: 15px;
-  font-weight: 600;
+
+.wordmark {
+  position: relative;
+  display: inline-block;
+  color: inherit;
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: -.045em;
+  line-height: 1;
+}
+
+.wordmark::after {
+  position: absolute;
+  inset: 0;
+  width: 0;
+  background: currentColor;
+  content: "";
+  pointer-events: none;
+  transition: width .22s ease;
+}
+
+.brand:hover .wordmark::after,
+.brand:focus-visible .wordmark::after {
+  width: 100%;
+}
+
+.foot .wordmark {
+  font-size: 18px;
 }
 .nav-links {
   display: flex;
