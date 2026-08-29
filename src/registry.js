@@ -23,7 +23,9 @@ export function createFindingRegistry() {
     get(id) { return records.get(id); },
     markRedacted(ids) {
       const selected = ids ? new Set(ids) : null;
-      for (const record of records.values()) if (!selected || selected.has(record.id)) record.status = "redacted";
+      for (const record of records.values()) {
+        if (selected ? selected.has(record.id) : record.status !== "excluded") record.status = "redacted";
+      }
     },
     exclude(ids) {
       for (const record of records.values()) if (ids.includes(record.id) && record.status !== "redacted") record.status = "excluded";

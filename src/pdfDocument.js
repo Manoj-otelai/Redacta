@@ -105,19 +105,27 @@ function formatBytes(size) {
   return `${(size / (1024 * 1024)).toFixed(1)}MB`;
 }
 
-function syntheticGroups(pageInfo, findings) {
+export function syntheticGroups(pageInfo, findings) {
   const indexes = new Map(pageInfo.items.map((entry, index) => [entry, index]));
   const groups = new Map();
+  const unplaced = [];
   for (const finding of findings) {
+    if (!Number.isInteger(finding.offset) || !Number.isInteger(finding.length) || finding.length <= 0) {
+      unplaced.push(finding);
+      continue;
+    }
     const localStart = finding.offset - pageInfo.start;
     const overlaps = pageInfo.items.filter((entry) => entry.start < localStart + finding.length && entry.end > localStart);
-    if (!overlaps.length) continue;
+    if (!overlaps.length) {
+      unplaced.push(finding);
+      continue;
+    }
     const key = overlaps.map((entry) => indexes.get(entry)).join(",");
     const group = groups.get(key) || { entries: overlaps, findings: [] };
     group.findings.push(finding);
     groups.set(key, group);
   }
-  return groups.values();
+  return { groups: [...groups.values()], unplaced };
 }
 
 export function syntheticRange(localStart, length, entries) {
@@ -159,7 +167,14 @@ export async function rasterizePdf(pdfDocument, registry, maskMode = "blackout")
         context.fillRect(box.x * 1.5, box.y * 1.5, box.width * 1.5, box.height * 1.5);
       }
     } else {
-      for (const group of syntheticGroups(pageInfo, active)) {
+      const { groups, unplaced } = syntheticGroups(pageInfo, active);
+      for (const finding of unplaced) {
+        const box = finding.boundingBox;
+        if (!box) continue;
+        context.fillStyle = "#111816";
+        context.fillRect(box.x * 1.5, box.y * 1.5, box.width * 1.5, box.height * 1.5);
+      }
+      for (const group of groups) {
         const entries = [...group.entries].sort((left, right) => left.start - right.start);
         const redacted = group.findings.filter((finding) => finding.status === "redacted");
         if (!redacted.length) continue;

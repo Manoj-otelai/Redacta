@@ -6,7 +6,7 @@ import { detectCandidates } from "../src/detectors.js";
 import { createFindingRegistry } from "../src/registry.js";
 import { loadTextDocument, createTextArtifact } from "../src/textDocument.js";
 import { applyRedactions, exportSanitizedDocument, getVerificationCertificate, scanDocumentPII, verifyRedaction } from "../src/tools.js";
-import { reconstructPageText, syntheticRange } from "../src/pdfDocument.js";
+import { reconstructPageText, syntheticGroups, syntheticRange } from "../src/pdfDocument.js";
 
 test("Luhn accepts valid cards and rejects invalid cards", () => {
   assert.equal(isLuhnValid("4111 1111 1111 1111"), true);
@@ -158,6 +158,30 @@ test("synthetic PDF ranges stay page-local when document offsets are global", ()
   assert.deepEqual(range, { start: localStart - entry.start, end: localStart - entry.start + original.length });
   assert.equal(rebuilt.includes(original), false);
   assert.equal(rebuilt.includes(replacement), true);
+});
+
+test("redacting without target ids leaves excluded findings untouched", () => {
+  const registry = createFindingRegistry();
+  registry.replace([
+    { type: "ssn", value: "123-45-6789", offset: 0, length: 11, confidence: 1 },
+    { type: "email", value: "a@example.com", offset: 20, length: 13, confidence: 1 },
+  ]);
+  const [first, second] = registry.all();
+  registry.exclude([second.id]);
+  registry.markRedacted();
+  assert.equal(registry.get(first.id).status, "redacted");
+  assert.equal(registry.get(second.id).status, "excluded");
+});
+
+test("synthetic grouping routes findings without text offsets to blackout fallback", () => {
+  const item = { str: "Employee SSN: 123-45-6789" };
+  const pageInfo = { start: 0, items: [{ start: 0, end: item.str.length, item }] };
+  const located = { offset: 14, length: 11, status: "redacted", value: "123-45-6789" };
+  const manual = { type: "manual_rectangle", status: "redacted", value: "", boundingBox: { x: 1, y: 2, width: 3, height: 4 } };
+  const { groups, unplaced } = syntheticGroups(pageInfo, [located, manual]);
+  assert.equal(groups.length, 1);
+  assert.deepEqual(groups[0].findings, [located]);
+  assert.deepEqual(unplaced, [manual]);
 });
 
 test("synthetic text replacement removes originals, reports placeholders, and opens export", async () => {
