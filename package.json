@@ -1,5 +1,5 @@
 {
-  "name": "privacyvault",
+  "name": "redacta",
   "version": "1.0.0",
   "description": "Browser-local, privacy-safe document scanning and redaction workspace.",
   "main": "src/app.js",

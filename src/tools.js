@@ -129,7 +129,7 @@ export async function exportSanitizedDocument(context, { filename } = {}) {
     const allowed = await context.requestConfirmation("Agent requested: Export the verified sanitized document");
     if (!allowed) return { status: "denied", verified: false, message: "User denied the export request." };
   }
-  const outputName = filename || `privacyvault-sanitized.${context.document.kind === "pdf" ? "pdf" : "txt"}`;
+  const outputName = filename || `redacta-sanitized.${context.document.kind === "pdf" ? "pdf" : "txt"}`;
   context.downloadArtifact?.(artifact.blob, outputName);
   return { status: "success", filename: outputName, size: artifact.blob.size, verified: true };
 }

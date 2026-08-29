@@ -146,7 +146,7 @@ export async function createDemoPdf() {
   const font = await output.embedFont("Helvetica");
   const pages = [
     [
-      "CONFIDENTIAL - PRIVACYVAULT DEMO / PAGE 1",
+      "CONFIDENTIAL - REDACTA DEMO / PAGE 1",
       "Employment Agreement - Northstar Labs",
       "Employee SSN: 123-45-6789",
       "Benefits contact: jordan.one@northstar.example",
@@ -154,14 +154,14 @@ export async function createDemoPdf() {
       "Integration key: sk_live_NORTHSTAR_01ab23cd",
     ],
     [
-      "CONFIDENTIAL - PRIVACYVAULT DEMO / PAGE 2",
+      "CONFIDENTIAL - REDACTA DEMO / PAGE 2",
       "Employee SSN: 234-56-7890",
       "Benefits contact: jordan.two@northstar.example",
       "Payroll card: 4242 4242 4242 4242",
       "Integration key: sk_test_NORTHSTAR_02ef45gh",
     ],
     [
-      "CONFIDENTIAL - PRIVACYVAULT DEMO / PAGE 3",
+      "CONFIDENTIAL - REDACTA DEMO / PAGE 3",
       "Employee SSN: 345-67-8901",
       "Employee SSN: 456-78-9012",
       "Benefits contact: jordan.three@northstar.example",
@@ -169,7 +169,7 @@ export async function createDemoPdf() {
       "HR contact: payroll@northstar.example",
     ],
     [
-      "CONFIDENTIAL - PRIVACYVAULT DEMO / PAGE 4",
+      "CONFIDENTIAL - REDACTA DEMO / PAGE 4",
       "Employee SSN: 567-89-0123",
       "Employee SSN: 678-90-1234",
       "Employee SSN: 789-01-2345",

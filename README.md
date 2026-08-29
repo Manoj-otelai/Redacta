@@ -1,6 +1,6 @@
-# PrivacyVault
+# Redacta
 
-PrivacyVault is a browser-local, zero-backend document privacy workspace. An AI agent can inspect, scan, redact, verify, and export without receiving document contents or sensitive values.
+Redacta is a browser-local, zero-backend document privacy workspace. An AI agent can inspect, scan, redact, verify, and export without receiving document contents or sensitive values.
 
 ## Privacy boundary
 

@@ -356,7 +356,7 @@ function renderPreview() {
     renderPdfPreview(pdfCanvas, state.pdfPage).catch(() => toast("Could not render the PDF preview."));
     return;
   }
-  preview.innerHTML = `<div class="text-page"><div class="document-topline"><span>Confidential</span><span>Local document / preview</span></div><h3>${escapeHtml(state.document.name.replace(/\.[^.]+$/, ""))}</h3><p class="text-content">${renderTextPreview()}</p><div class="document-footer"><span>PrivacyVault · private</span><span>Page 1 of 1</span></div></div>`;
+  preview.innerHTML = `<div class="text-page"><div class="document-topline"><span>Confidential</span><span>Local document / preview</span></div><h3>${escapeHtml(state.document.name.replace(/\.[^.]+$/, ""))}</h3><p class="text-content">${renderTextPreview()}</p><div class="document-footer"><span>Redacta · private</span><span>Page 1 of 1</span></div></div>`;
   pdfCanvas = null;
   attachManualTextSelection(preview.firstElementChild);
 }
@@ -622,7 +622,7 @@ async function runAgentDemo() {
             maskMode: state.maskMode,
           }
         : step.key === "exportSanitizedDocument"
-          ? { filename: `privacyvault-sanitized.${state.document.format}` }
+          ? { filename: `redacta-sanitized.${state.document.format}` }
           : {};
       let result;
       if (step.key === "scanDocumentPII") setScanProgress(0);
@@ -771,7 +771,7 @@ export function initUI() {
   $("redactButton").addEventListener("click", runRedaction);
   $("verifyButton").addEventListener("click", runVerification);
   $("exportButton").addEventListener("click", async () => {
-    const result = await executeTool("exportSanitizedDocument", { filename: `privacyvault-sanitized.${state.document.format}` }, "user");
+    const result = await executeTool("exportSanitizedDocument", { filename: `redacta-sanitized.${state.document.format}` }, "user");
     if (result.status === "success") toast("Verified copy downloaded locally");
     else toast("Export blocked until verification passes.");
   });
