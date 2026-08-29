@@ -202,7 +202,7 @@ img { display: block; max-width: 100%; }
   -webkit-mask-image: linear-gradient(to left, #000 34%, transparent 96%);
   mask-image: linear-gradient(to left, #000 34%, transparent 96%);
 }
-@media (max-width: 1080px) {
+@media (max-width: 1200px) {
   .hero-art { display: none; }
 }
 .hero h1 { font-size: clamp(40px, 6.4vw, 76px); }
