@@ -483,13 +483,17 @@ test("structured fields are unavailable for TXT documents", async () => {
 });
 
 test("JSON field redaction verifies and issues a certificate", async () => {
-  const json = '{"records":[{"ssn":"123-45-6789"},{"ssn":"987-65-4321"}],"meta":{"record_count":2}}';
+  const json = '{"records":[{"ssn":"123-45-6789","email":"a@example.test"},{"ssn":"987-65-4321","email":"b@example.test"}],"meta":{"record_count":2}}';
   const document = await loadTextDocument({ name: "records.json", type: "application/json", text: async () => json });
   const registry = createFindingRegistry();
   const state = { artifact: null, verification: null, revision: 0, maskMode: "blackout", customPatterns: [] };
   const context = { document, registry, state, callSource: "user", onFindingsChanged() {}, onVerificationChanged() {}, onStateChanged() {} };
   await scanDocumentPII(context);
   await redactField(context, { field: "records[].ssn" });
+  const remainingIds = registry.all()
+    .filter((finding) => finding.status === "pending")
+    .map((finding) => finding.id);
+  await applyRedactions(context, { targetIds: remainingIds });
   const verification = await verifyRedaction(context);
   assert.equal(verification.passed, true);
   assert.equal(verification.originalValuesFound, 0);

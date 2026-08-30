@@ -34,30 +34,30 @@ const demoJson = JSON.stringify({
     {
       employee_id: "EMP-100001",
       ssn: "123-45-6789",
-      email: "ava (at) example.test",
-      phone: "phone-demo-01",
-      card: "card-demo-01",
-      integration_token: "integration-demo-01",
+      email: "ava.chen@northstar.example",
+      phone: "(415) 555-0101",
+      card: "4111 1111 1111 1111",
+      integration_token: "sk_live_51NORTHSTAR_8df7a",
     },
     {
       employee_id: "EMP-100002",
       ssn: "234-56-7890",
-      email: "liam (at) example.test",
-      phone: "phone-demo-02",
-      card: "card-demo-02",
-      integration_token: "integration-demo-02",
+      email: "liam.ortiz@northstar.example",
+      phone: "(415) 555-0102",
+      card: "4000 0566 5566 5556",
+      integration_token: "sk_live_51NORTHSTAR_9jk2b",
     },
     {
       employee_id: "EMP-100003",
       ssn: "345-67-8901",
-      email: "mira (at) example.test",
-      phone: "phone-demo-03",
-      card: "card-demo-03",
-      integration_token: "integration-demo-03",
+      email: "mira.patel@northstar.example",
+      phone: "(415) 555-0103",
+      card: "5555 5555 5555 4444",
+      integration_token: "sk_live_51NORTHSTAR_4pq6c",
     },
   ],
   meta: {
-    owner_email: "ops (at) example.test",
+    owner_email: "ops@northstar.example",
     record_count: 3,
   },
 }, null, 2);
@@ -66,7 +66,7 @@ const loadDemoText = async () => loadDocument(await loadTextDocument(new File([d
 const loadDemoJson = async () => loadDocument(await loadTextDocument(new File([demoJson], "redacta-demo-records.json", { type: "application/json" })));
 const loadDemoPdf = async () => loadDocument(await loadPdfDocument(await createDemoPdf()));
 const toolMap = { inspectDocument, scanDocumentPII, applyRedactions, verifyRedaction, getFindingDetails, exportSanitizedDocument, getVerificationCertificate, registerCustomPattern, listStructuredFields, redactField };
-const state = { document: null, artifact: null, verification: null, customPatterns: [], maskMode: "blackout", revision: 0, lastRedactionBatch: [], manualMode: false, pdfPage: 1, zoom: 1 };
+const state = { document: null, artifact: null, verification: null, structuredFields: [], customPatterns: [], maskMode: "blackout", revision: 0, lastRedactionBatch: [], manualMode: false, pdfPage: 1, zoom: 1 };
 const registry = createFindingRegistry();
 const audit = { calls: 0, leaks: 0 };
 const AGENT_STEPS = [
@@ -649,7 +649,7 @@ function renderStructuredFields() {
   const visible = Boolean(state.document && ["json", "csv"].includes(state.document.format));
   section.hidden = !visible;
   if (!visible) return;
-  const fields = structuredFields(state.document);
+  const fields = state.structuredFields;
   $("structuredFieldCount").textContent = `${fields.length} field${fields.length === 1 ? "" : "s"}`;
   const list = $("structuredFieldList");
   list.replaceChildren();
@@ -878,6 +878,7 @@ async function runAgentDemo() {
 
 async function loadDocument(document) {
   state.document = document;
+  state.structuredFields = structuredFields(document);
   state.revision += 1;
   state.artifact = null;
   state.verification = null;
