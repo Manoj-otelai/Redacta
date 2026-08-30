@@ -141,6 +141,9 @@
                   <input id="customPatternName" name="name" type="text" autocomplete="off" />
                   <label class="field-label" for="customPatternSource">Pattern</label>
                   <input id="customPatternSource" name="pattern" type="text" autocomplete="off" />
+                  <label class="field-label" for="customPatternFlags">Flags</label>
+                  <p class="custom-pattern-hint">Allowed flags: i, m, s, u.</p>
+                  <input id="customPatternFlags" name="flags" type="text" autocomplete="off" />
                   <button class="button button-secondary full" type="submit">Register pattern</button>
                   <p class="custom-pattern-error" id="customPatternError" role="alert" aria-live="polite"></p>
                 </form>
@@ -242,7 +245,7 @@
       </footer>
     </div>
 
-    <div class="toast" id="toast" role="status"></div>
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
     <div class="permission-modal" id="permissionModal" hidden>
       <div class="permission-dialog" role="dialog" aria-modal="true" aria-labelledby="permissionTitle">
         <div class="permission-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="7" width="16" height="12" rx="2" /><path d="M9 12h.01M15 12h.01M10 16h4M12 4v3" /></svg></div>

@@ -866,6 +866,7 @@ async function registerPatternFromForm(event) {
   const result = await executeTool("registerCustomPattern", {
     name: $("customPatternName").value,
     pattern: $("customPatternSource").value,
+    flags: $("customPatternFlags").value,
   }, "user");
   if (result.status !== "success") {
     error.textContent = result.message;
