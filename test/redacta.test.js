@@ -134,7 +134,7 @@ test("detector skips zero-length custom matches", () => {
   assert.deepEqual(findings.map((finding) => finding.length), [1]);
 });
 
-test("verification exposes a count and projected remaining list", async () => {
+test("verification exposes a count and projected unmasked list", async () => {
   const registry = createFindingRegistry();
   const document = await loadTextDocument("SSN 123-45-6789 and email test@example.com");
   const state = { artifact: null, verification: null, revision: 0, maskMode: "blackout" };
@@ -145,8 +145,10 @@ test("verification exposes a count and projected remaining list", async () => {
   const result = await verifyRedaction(context);
   assert.equal(typeof result.remainingFindings, "number");
   assert.equal(result.remainingFindings, 1);
-  assert.equal(result.remaining.length, 1);
-  assert.equal(result.remaining.every((finding) => !("value" in finding)), true);
+  assert.equal("remaining" in result, false);
+  for (const finding of result.unmasked) {
+    assert.deepEqual(Object.keys(finding).sort(), ["confidence", "id", "origin", "page", "status", "type"]);
+  }
 });
 
 test("verification fails on an unmasked finding even when the artifact has no extractable text", async () => {

@@ -97,7 +97,7 @@ export async function applyRedactions(context, { targetIds, maskMode = "blackout
 }
 
 export async function verifyRedaction(context, { categories } = {}) {
-  if (!context.document) return { status: "failed", passed: false, remainingFindings: 0, remaining: [], categories: {}, message: "No document loaded." };
+  if (!context.document) return { status: "failed", passed: false, remainingFindings: 0, categories: {}, message: "No document loaded." };
   const selection = categoryScope(context, categories);
   if (selection.error) return selection.error;
   const scope = selection.scope;
@@ -111,7 +111,6 @@ export async function verifyRedaction(context, { categories } = {}) {
         status: "failed",
         passed: false,
         remainingFindings: 0,
-        remaining: [],
         categories: Object.fromEntries(scope.map((type) => [type, 0])),
         message: "Generated artifact integrity check failed.",
         integrityFailure: true,
@@ -131,13 +130,15 @@ export async function verifyRedaction(context, { categories } = {}) {
     context.registry.all().map((finding) => ({ type: finding.type, value: finding.value })),
     context.state.customPatterns ?? [],
   );
+  const remaining = result.remaining;
+  delete result.remaining;
   const unmasked = context.registry.all().filter((finding) => finding.status !== "redacted" && scope.includes(finding.type));
   const countFor = (type) => Math.max(
-    result.remaining.filter((finding) => finding.type === type).length,
+    remaining.filter((finding) => finding.type === type).length,
     unmasked.filter((finding) => finding.type === type).length,
   );
   result.categories = Object.fromEntries(scope.map((type) => [type, countFor(type)]));
-  result.extractableFindings = result.remaining.length;
+  result.extractableFindings = remaining.length;
   result.unmaskedRegions = unmasked.length;
   result.unmasked = unmasked.map(context.registry.project);
   result.remainingFindings = Object.values(result.categories).reduce((total, count) => total + count, 0);

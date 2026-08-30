@@ -196,6 +196,11 @@ function auditPayload(result) {
 
 function summarizeResult(name, result) {
   const safe = safeResult(result);
+  if (name === "getFindingDetails") {
+    return result.id
+      ? [result.type, result.id].filter(Boolean).join(" · ")
+      : safe.message || "finding not found";
+  }
   if (safe.status && !["success", "verified", "failed"].includes(safe.status)) {
     return safe.message ? `${safe.status} — ${safe.message}` : safe.status;
   }
@@ -214,8 +219,6 @@ function summarizeResult(name, result) {
       return safe.passed
         ? `passed · 0 remaining across ${Object.keys(safe.categories ?? {}).length} categories`
         : `failed · ${plural(safe.remainingFindings ?? 0, "finding")} remaining`;
-    case "getFindingDetails":
-      return [result.type, result.id].filter(Boolean).join(" · ") || "finding not found";
     case "exportSanitizedDocument":
       return `${safe.filename} · verified`;
     case "getVerificationCertificate":
