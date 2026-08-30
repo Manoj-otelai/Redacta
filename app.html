@@ -16,6 +16,7 @@
         <nav class="menu-bar" aria-label="Application menus">
           <button class="menu-item" id="menuOpen" type="button">File</button>
           <button class="menu-item" id="menuDemoText" type="button">Demo TXT</button>
+          <button class="menu-item" id="menuDemoJson" type="button">Demo JSON</button>
           <button class="menu-item" id="menuDemoPdf" type="button">Demo PDF</button>
         </nav>
         <div class="doc-chip">
@@ -127,6 +128,16 @@
                   <option value="synthetic_replacement">Synthetic replacement</option>
                 </select>
               </label>
+              <section class="custom-patterns" id="structuredFieldsSection" aria-labelledby="structuredFieldsTitle" hidden>
+                <div class="custom-patterns-head">
+                  <span id="structuredFieldsTitle">Structured fields</span>
+                  <span class="custom-pattern-count mono" id="structuredFieldCount">0 fields</span>
+                </div>
+                <p class="custom-pattern-hint">Redact every value of a key or column. Field names are structure, not contents.</p>
+                <div class="custom-pattern-list" id="structuredFieldList">
+                  <div class="custom-pattern-empty">No structured fields detected.</div>
+                </div>
+              </section>
               <section class="custom-patterns" aria-labelledby="customPatternsTitle">
                 <div class="custom-patterns-head">
                   <span id="customPatternsTitle">Custom patterns</span>

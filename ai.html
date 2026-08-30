@@ -133,7 +133,7 @@ result: extractable: 0 · unmasked regions: 0 · original values: 0 · export un
   </section>
 
   <section class="blk" id="tools">
-    <div class="blk-body"><pre><span class="m-heading m-h2"><span class="m-hash">##</span> WebMCP surface — eight tools, capabilities not contents</span>
+    <div class="blk-body"><pre><span class="m-heading m-h2"><span class="m-hash">##</span> WebMCP surface — ten tools, capabilities not contents</span>
 
 Registered on document.modelContext when native WebMCP is available, with a
 Demo Mode console when it isn't — the same tools, the same boundary.
@@ -160,6 +160,11 @@ Demo Mode console when it isn't — the same tools, the same boundary.
   &rarr; validates and registers a local detector.  Requires human approval.
 
   results expose counts and locations only, never contents or values.
+<span class="m-signature">listStructuredFields({})</span>
+  &rarr; lists JSON keys or CSV columns with occurrence counts only.
+<span class="m-signature">redactField({field, maskMode?})</span>
+  &rarr; redacts one JSON key or CSV column locally.  Requires human approval.
+    Only string JSON leaves and CSV cells are redactable.
 
 agent prompt to try:
   Inspect this document, scan it for SSNs, credit cards, emails and API keys,

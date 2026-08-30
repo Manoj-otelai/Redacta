@@ -3,6 +3,7 @@ import { loadTextDocument } from "./textDocument.js";
 import { createDemoPdf, loadPdfDocument } from "./pdfDocument.js";
 import { MAX_CUSTOM_PATTERNS, syntheticReplacement } from "./detectors.js";
 import { installNetworkMonitor } from "./network.js";
+import { structuredFields } from "./structured.js";
 import {
   applyRedactions,
   buildArtifact,
@@ -10,6 +11,8 @@ import {
   getVerificationCertificate,
   getFindingDetails,
   inspectDocument,
+  listStructuredFields,
+  redactField,
   registerCustomPattern,
   scanDocumentPII,
   TOOL_DESCRIPTIONS,
@@ -26,10 +29,43 @@ Contact: jordan.lee@northstar.example - (415) 555-0198
 Payroll will be deposited to card ending 4111 1111 1111 1111.
 Internal integration token: sk_live_51NORTHSTAR_8df7a.
 The parties agree to the terms and conditions set forth below.`;
+const demoJson = JSON.stringify({
+  records: [
+    {
+      employee_id: "EMP-100001",
+      ssn: "123-45-6789",
+      email: "ava (at) example.test",
+      phone: "phone-demo-01",
+      card: "card-demo-01",
+      integration_token: "integration-demo-01",
+    },
+    {
+      employee_id: "EMP-100002",
+      ssn: "234-56-7890",
+      email: "liam (at) example.test",
+      phone: "phone-demo-02",
+      card: "card-demo-02",
+      integration_token: "integration-demo-02",
+    },
+    {
+      employee_id: "EMP-100003",
+      ssn: "345-67-8901",
+      email: "mira (at) example.test",
+      phone: "phone-demo-03",
+      card: "card-demo-03",
+      integration_token: "integration-demo-03",
+    },
+  ],
+  meta: {
+    owner_email: "ops (at) example.test",
+    record_count: 3,
+  },
+}, null, 2);
 
 const loadDemoText = async () => loadDocument(await loadTextDocument(new File([demoText], "confidential-employment-contract.txt", { type: "text/plain" })));
+const loadDemoJson = async () => loadDocument(await loadTextDocument(new File([demoJson], "redacta-demo-records.json", { type: "application/json" })));
 const loadDemoPdf = async () => loadDocument(await loadPdfDocument(await createDemoPdf()));
-const toolMap = { inspectDocument, scanDocumentPII, applyRedactions, verifyRedaction, getFindingDetails, exportSanitizedDocument, getVerificationCertificate, registerCustomPattern };
+const toolMap = { inspectDocument, scanDocumentPII, applyRedactions, verifyRedaction, getFindingDetails, exportSanitizedDocument, getVerificationCertificate, registerCustomPattern, listStructuredFields, redactField };
 const state = { document: null, artifact: null, verification: null, customPatterns: [], maskMode: "blackout", revision: 0, lastRedactionBatch: [], manualMode: false, pdfPage: 1, zoom: 1 };
 const registry = createFindingRegistry();
 const audit = { calls: 0, leaks: 0 };
@@ -53,6 +89,7 @@ const TYPE_LABELS = {
   private_key: "Private key",
   bearer_token: "Bearer token",
   db_connection_string: "Database URI",
+  structured_field: "Structured field",
   manual_rectangle: "Manual region",
   manual: "Manual selection",
 };
@@ -541,6 +578,7 @@ function render() {
     }
   }
   renderCategorySummary(findings);
+  renderStructuredFields();
   renderCustomPatterns();
   renderVerificationSummary();
   renderCertificateCard();
@@ -602,6 +640,44 @@ function renderCustomPatterns() {
     remove.textContent = "Remove";
     remove.setAttribute("aria-label", `Remove pattern ${pattern.name}`);
     row.append(details, remove);
+    list.append(row);
+  }
+}
+
+function renderStructuredFields() {
+  const section = $("structuredFieldsSection");
+  const visible = Boolean(state.document && ["json", "csv"].includes(state.document.format));
+  section.hidden = !visible;
+  if (!visible) return;
+  const fields = structuredFields(state.document);
+  $("structuredFieldCount").textContent = `${fields.length} field${fields.length === 1 ? "" : "s"}`;
+  const list = $("structuredFieldList");
+  list.replaceChildren();
+  if (!fields.length) {
+    const empty = document.createElement("div");
+    empty.className = "custom-pattern-empty";
+    empty.textContent = "No structured fields detected.";
+    list.append(empty);
+    return;
+  }
+  for (const { field, occurrences } of fields) {
+    const row = document.createElement("div");
+    row.className = "custom-pattern-row";
+    const details = document.createElement("div");
+    details.className = "custom-pattern-details";
+    const name = document.createElement("code");
+    name.textContent = field;
+    const count = document.createElement("span");
+    count.className = "custom-pattern-count";
+    count.textContent = `${occurrences} value${occurrences === 1 ? "" : "s"}`;
+    details.append(name, count);
+    const redact = document.createElement("button");
+    redact.className = "custom-pattern-remove";
+    redact.type = "button";
+    redact.dataset.fieldName = field;
+    redact.textContent = "Redact";
+    redact.setAttribute("aria-label", `Redact field ${field}`);
+    row.append(details, redact);
     list.append(row);
   }
 }
@@ -884,6 +960,16 @@ async function removeCustomPattern(name) {
   toast("Pattern removed \u2014 rescanned locally.");
 }
 
+async function redactStructuredField(field) {
+  const result = await executeTool("redactField", { field, maskMode: state.maskMode }, "user");
+  if (result.status !== "success") {
+    toast(result.message || "Field redaction failed.");
+    return;
+  }
+  render();
+  toast("Field redacted locally.");
+}
+
 function registerTools() {
   const execute = (name, input) => executeTool(name, input, "agent");
   if (!document.modelContext?.registerTool) {
@@ -914,6 +1000,7 @@ export function initUI() {
   stage.addEventListener("drop", (event) => { event.preventDefault(); $("dropZone").classList.remove("dragging"); handleFile(event.dataTransfer.files[0]); });
   $("scanButton").addEventListener("click", runScan);
   $("loadDemoButton").addEventListener("click", loadDemoText);
+  $("menuDemoJson").addEventListener("click", loadDemoJson);
   $("loadDemoPdfButton").addEventListener("click", loadDemoPdf);
   $("menuDemoText").addEventListener("click", loadDemoText);
   $("menuDemoPdf").addEventListener("click", loadDemoPdf);
@@ -997,6 +1084,10 @@ export function initUI() {
   $("customPatternList").addEventListener("click", (event) => {
     const button = event.target.closest("[data-pattern-name]");
     if (button) void removeCustomPattern(button.dataset.patternName);
+  });
+  $("structuredFieldList").addEventListener("click", (event) => {
+    const button = event.target.closest("[data-field-name]");
+    if (button) void redactStructuredField(button.dataset.fieldName);
   });
   document.addEventListener("keydown", (event) => {
     if (event.key === "Escape") {

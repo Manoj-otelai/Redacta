@@ -4,8 +4,9 @@ import { isLuhnValid, isStructurallyValidSsn } from "../src/validators.js";
 import { confidenceScore } from "../src/scoring.js";
 import { detectCandidates, syntheticReplacement, validateCustomPattern } from "../src/detectors.js";
 import { createFindingRegistry } from "../src/registry.js";
+import { structuredFieldRanges, structuredFields } from "../src/structured.js";
 import { loadTextDocument, createTextArtifact } from "../src/textDocument.js";
-import { applyRedactions, exportSanitizedDocument, getVerificationCertificate, registerCustomPattern, scanDocumentPII, verifyRedaction } from "../src/tools.js";
+import { applyRedactions, exportSanitizedDocument, getVerificationCertificate, listStructuredFields, redactField, registerCustomPattern, scanDocumentPII, verifyRedaction } from "../src/tools.js";
 import { reconstructPageText, syntheticGroups, syntheticRange } from "../src/pdfDocument.js";
 
 test("Luhn accepts valid cards and rejects invalid cards", () => {
@@ -372,4 +373,125 @@ test("blackout mode still reports no synthetic placeholders", async () => {
   const result = await verifyRedaction(context);
   assert.equal(result.passed, true);
   assert.equal(result.syntheticPlaceholders, 0);
+});
+
+test("structured fields aggregate JSON string leaves without exposing values", async () => {
+  const sensitive = "123-45-6789";
+  const owner = "owner@example.test";
+  const json = `{"records":[{"ssn":"${sensitive}","record_count":1},{"ssn":"987-65-4321","record_count":2}],"meta":{"owner_email":"${owner}","active":true}}`;
+  const document = await loadTextDocument({ name: "records.json", type: "application/json", text: async () => json });
+  const fields = structuredFields(document);
+  assert.deepEqual(fields, [
+    { field: "records[].ssn", occurrences: 2 },
+    { field: "meta.owner_email", occurrences: 1 },
+  ]);
+  assert.equal(JSON.stringify(fields).includes(sensitive), false);
+  assert.equal(JSON.stringify(fields).includes(owner), false);
+  assert.equal(JSON.stringify(fields).includes("record_count"), false);
+});
+
+test("structured field ranges slice back to exact original values", async () => {
+  const json = '{"records":[{"email":"a@example.test"},{"email":"b@example.test"}]}';
+  const document = await loadTextDocument({ name: "records.json", type: "application/json", text: async () => json });
+  const ranges = structuredFieldRanges(document, "records[].email");
+  assert.equal(ranges.length, 2);
+  assert.deepEqual(ranges.map(({ start, end, value }) => json.slice(start, end) === value), [true, true]);
+  assert.deepEqual(ranges.map(({ value }) => value), ["a@example.test", "b@example.test"]);
+});
+
+test("redacting a JSON field requires approval and preserves valid JSON", async () => {
+  const json = '{"records":[{"ssn":"123-45-6789"},{"ssn":"987-65-4321"}],"meta":{"record_count":2}}';
+  const document = await loadTextDocument({ name: "records.json", type: "application/json", text: async () => json });
+  const deniedRegistry = createFindingRegistry();
+  const deniedState = { artifact: null, verification: null, revision: 0, maskMode: "blackout", customPatterns: [] };
+  const deniedContext = {
+    document,
+    registry: deniedRegistry,
+    state: deniedState,
+    callSource: "agent",
+    requestConfirmation: async (message) => {
+      assert.equal(message, 'Agent requested: redact field "records[].ssn" (2 values)');
+      return false;
+    },
+    onFindingsChanged() {},
+    onVerificationChanged() {},
+    onStateChanged() {},
+  };
+  await scanDocumentPII(deniedContext);
+  const before = deniedRegistry.all().map((finding) => ({ ...finding }));
+  const denied = await redactField(deniedContext, { field: "records[].ssn" });
+  assert.deepEqual(denied, { status: "denied", message: "User denied the field redaction request." });
+  assert.deepEqual(deniedRegistry.all(), before);
+  assert.equal(deniedState.artifact, null);
+
+  const registry = createFindingRegistry();
+  const state = { artifact: null, verification: null, revision: 0, maskMode: "blackout", customPatterns: [] };
+  const context = { document, registry, state, callSource: "user", onFindingsChanged() {}, onVerificationChanged() {}, onStateChanged() {} };
+  await scanDocumentPII(context);
+  const initialCount = registry.all().length;
+  const result = await redactField(context, { field: "records[].ssn" });
+  assert.equal(result.status, "success");
+  assert.equal(result.valuesRedacted, 2);
+  assert.equal(registry.all().length, initialCount);
+  const artifactText = await state.artifact.blob.text();
+  assert.equal(artifactText.includes("123-45-6789"), false);
+  assert.equal(artifactText.includes("987-65-4321"), false);
+  assert.equal(artifactText.includes('"records"'), true);
+  assert.equal(artifactText.includes('"ssn"'), true);
+  assert.doesNotThrow(() => JSON.parse(artifactText));
+});
+
+test("redacting a scanned JSON field creates no duplicate records", async () => {
+  const json = '{"records":[{"email":"a@example.test"},{"email":"b@example.test"}]}';
+  const document = await loadTextDocument({ name: "records.json", type: "application/json", text: async () => json });
+  const registry = createFindingRegistry();
+  const state = { artifact: null, verification: null, revision: 0, maskMode: "blackout", customPatterns: [] };
+  const context = { document, registry, state, callSource: "user", onFindingsChanged() {}, onVerificationChanged() {}, onStateChanged() {} };
+  await scanDocumentPII(context);
+  const count = registry.all().length;
+  const result = await redactField(context, { field: "records[].email" });
+  assert.equal(result.valuesRedacted, 2);
+  assert.equal(registry.all().length, count);
+  const artifactText = await state.artifact.blob.text();
+  assert.equal(artifactText.includes("a@example.test"), false);
+  assert.equal(artifactText.includes("b@example.test"), false);
+});
+
+test("redacting a CSV column masks every data cell without changing other columns", async () => {
+  const csv = "employee_id,ssn,note\nEMP-1,123-45-6789,alpha\nEMP-2,987-65-4321,beta\n";
+  const document = await loadTextDocument({ name: "records.csv", type: "text/csv", text: async () => csv });
+  const registry = createFindingRegistry();
+  const state = { artifact: null, verification: null, revision: 0, maskMode: "blackout", customPatterns: [] };
+  const context = { document, registry, state, callSource: "user", onFindingsChanged() {}, onVerificationChanged() {}, onStateChanged() {} };
+  const result = await redactField(context, { field: "ssn" });
+  assert.equal(result.valuesRedacted, 2);
+  const output = await state.artifact.blob.text();
+  const inputRows = csv.trimEnd().split("\n");
+  const outputRows = output.trimEnd().split("\n");
+  assert.equal(outputRows[0], inputRows[0]);
+  assert.deepEqual(outputRows.map((row) => row.split(",")[0]), inputRows.map((row) => row.split(",")[0]));
+  assert.deepEqual(outputRows.map((row) => row.split(",")[2]), inputRows.map((row) => row.split(",")[2]));
+  assert.equal(output.includes("123-45-6789"), false);
+  assert.equal(output.includes("987-65-4321"), false);
+});
+
+test("structured fields are unavailable for TXT documents", async () => {
+  const document = await loadTextDocument("plain text");
+  const result = await listStructuredFields({ document, registry: createFindingRegistry(), state: {} });
+  assert.equal(result.status, "error");
+  assert.equal(result.message, "Structured fields are available for JSON and CSV documents only.");
+});
+
+test("JSON field redaction verifies and issues a certificate", async () => {
+  const json = '{"records":[{"ssn":"123-45-6789"},{"ssn":"987-65-4321"}],"meta":{"record_count":2}}';
+  const document = await loadTextDocument({ name: "records.json", type: "application/json", text: async () => json });
+  const registry = createFindingRegistry();
+  const state = { artifact: null, verification: null, revision: 0, maskMode: "blackout", customPatterns: [] };
+  const context = { document, registry, state, callSource: "user", onFindingsChanged() {}, onVerificationChanged() {}, onStateChanged() {} };
+  await scanDocumentPII(context);
+  await redactField(context, { field: "records[].ssn" });
+  const verification = await verifyRedaction(context);
+  assert.equal(verification.passed, true);
+  assert.equal(verification.originalValuesFound, 0);
+  assert.ok(verification.certificate);
 });

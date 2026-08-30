@@ -1,5 +1,6 @@
 import { detectorTypes, MAX_CUSTOM_PATTERNS, validateCustomPattern } from "./detectors.js";
 import { scanText } from "./scanner.js";
+import { structuredFieldRanges, structuredFields } from "./structured.js";
 import { createTextArtifact } from "./textDocument.js";
 import { verifyArtifact } from "./verify.js";
 
@@ -21,6 +22,8 @@ export const TOOL_SCHEMAS = {
   exportSanitizedDocument: { type: "object", properties: { filename: { type: "string" } }, additionalProperties: false },
   getVerificationCertificate: { type: "object", properties: {}, additionalProperties: false },
   registerCustomPattern: { type: "object", properties: { name: { type: "string" }, pattern: { type: "string" }, flags: { type: "string" } }, required: ["name", "pattern"], additionalProperties: false },
+  listStructuredFields: { type: "object", properties: {}, additionalProperties: false },
+  redactField: { type: "object", properties: { field: { type: "string" }, maskMode: { type: "string", enum: ["blackout", "synthetic_replacement"] } }, required: ["field"], additionalProperties: false },
 };
 
 export const TOOL_DESCRIPTIONS = {
@@ -32,6 +35,8 @@ export const TOOL_DESCRIPTIONS = {
   exportSanitizedDocument: "Download the verified local artifact; never returns document contents or sensitive values.",
   getVerificationCertificate: "Retrieve metadata-only proof that the local artifact passed verification; never returns document contents or sensitive values.",
   registerCustomPattern: "Register a custom pattern locally after human approval; results expose counts and locations only and never include document contents or sensitive values.",
+  listStructuredFields: "List the structural keys or columns of a local JSON or CSV document with occurrence counts; returns field names and counts only, never document contents or sensitive values.",
+  redactField: "Redact every value of one JSON key or CSV column locally after human approval; never returns document contents or sensitive values.",
 };
 
 function validCategories(context) {
@@ -196,6 +201,77 @@ export async function registerCustomPattern(context, { name, pattern, flags = ""
   context.state.customPatterns = [...customPatterns, validation.value];
   invalidate(context);
   return { status: "success", name: validation.value.name, totalPatterns: context.state.customPatterns.length };
+}
+
+function structuredDocumentError(context) {
+  if (!context.document) return safeError("No document loaded.");
+  if (context.document.kind === "pdf" || context.document.format === "txt") {
+    return safeError("Structured fields are available for JSON and CSV documents only.");
+  }
+  return null;
+}
+
+export async function listStructuredFields(context) {
+  const error = structuredDocumentError(context);
+  if (error) return error;
+  const fields = structuredFields(context.document);
+  return {
+    status: "success",
+    format: context.document.format,
+    fields: fields.map(({ field, occurrences }) => {
+      const ranges = structuredFieldRanges(context.document, field);
+      const detectedFindings = context.registry.all().filter((finding) => (
+        Number.isInteger(finding.charStart)
+        && Number.isInteger(finding.charEnd)
+        && ranges.some(({ start, end }) => finding.charStart < end && finding.charEnd > start)
+      )).length;
+      return { field, occurrences, detectedFindings };
+    }),
+  };
+}
+
+export async function redactField(context, { field, maskMode = "blackout" } = {}) {
+  const error = structuredDocumentError(context);
+  if (error) return error;
+  if (!["blackout", "synthetic_replacement"].includes(maskMode)) return safeError("Unsupported mask mode.");
+  const ranges = structuredFieldRanges(context.document, field);
+  if (!ranges.length) return safeError("Unknown field.");
+  if (context.callSource === "agent") {
+    const allowed = context.requestConfirmation
+      ? await context.requestConfirmation(`Agent requested: redact field "${field}" (${ranges.length} values)`)
+      : false;
+    if (!allowed) return { status: "denied", message: "User denied the field redaction request." };
+  }
+  const ids = [];
+  for (const range of ranges) {
+    const existing = context.registry.all().find((finding) => finding.charStart === range.start && finding.charEnd === range.end);
+    if (existing) {
+      ids.push(existing.id);
+      continue;
+    }
+    const record = context.registry.addManual({
+      type: "structured_field",
+      value: range.value,
+      page: 1,
+      location: `characters ${range.start}-${range.end}`,
+      charStart: range.start,
+      charEnd: range.end,
+    });
+    ids.push(record.id);
+  }
+  context.registry.markRedacted(ids);
+  invalidate(context);
+  await buildArtifact(context, { maskMode });
+  context.state.maskMode = maskMode;
+  context.onFindingsChanged?.();
+  return {
+    status: "success",
+    field,
+    valuesRedacted: ranges.length,
+    totalRedacted: context.registry.active().length,
+    maskMode,
+    findings: context.registry.projectAll(),
+  };
 }
 
 export async function getFindingDetails(context, { findingId } = {}) {

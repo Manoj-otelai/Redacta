@@ -240,7 +240,7 @@
     <div class="wrap tools-grid">
       <div>
         <p class="eyebrow">WebMCP surface</p>
-        <h2 class="display">Eight tools. Capabilities, not contents.</h2>
+        <h2 class="display">Ten tools. Capabilities, not contents.</h2>
         <p class="lede">Registered on <code>document.modelContext</code> when native WebMCP is available, with a Demo Mode console when it isn't — the same tools, the same boundary.</p>
         <div class="hero-actions" style="justify-content:flex-start">
           <a class="btn btn-light" href="https://github.com/Manoj-otelai/Redacta">Read the source</a>
@@ -255,6 +255,8 @@
         <div class="tool"><code>exportSanitizedDocument</code><p>Downloads the sanitized copy. <b>Blocked until verification passes.</b></p></div>
         <div class="tool"><code>getVerificationCertificate</code><p>Returns metadata-only proof for a verified artifact. <b>Never includes document contents or values.</b></p></div>
         <div class="tool"><code>registerCustomPattern</code><p>Registers a local detector from a validated pattern. <b>Requires human approval; returns counts and locations only.</b></p></div>
+        <div class="tool"><code>listStructuredFields</code><p>Lists JSON keys or CSV columns with occurrence counts. <b>Never returns contents or values.</b></p></div>
+        <div class="tool"><code>redactField</code><p>Redacts every value of one JSON key or CSV column locally. <b>Requires human approval.</b></p></div>
       </div>
     </div>
   </section>
