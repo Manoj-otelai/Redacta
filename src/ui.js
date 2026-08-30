@@ -424,6 +424,7 @@ function createPdfCanvas(preview) {
   frame.className = "pdf-frame";
   const canvas = document.createElement("canvas");
   canvas.className = "pdf-preview";
+  canvas.setAttribute("aria-hidden", "true");
   const overlay = document.createElement("div");
   overlay.className = "pdf-overlay";
   frame.append(canvas, overlay);
@@ -473,6 +474,12 @@ function renderViewerChrome() {
   $("zoomIn").disabled = state.zoom >= ZOOM_STEPS.at(-1);
   $("zoomOut").disabled = state.zoom <= ZOOM_STEPS[0];
   $("zoomFit").disabled = state.document?.kind !== "pdf";
+  $("documentPreview").setAttribute(
+    "aria-label",
+    state.document?.kind === "pdf"
+      ? `Document preview, page ${state.pdfPage} of ${pageCount}, rendered as an image`
+      : "Document preview",
+  );
   $("documentPreview").style.setProperty("--doc-zoom", state.zoom);
   $("documentPreview").classList.toggle("is-marking", state.manualMode);
   $("manualButton").classList.toggle("is-active", state.manualMode);
@@ -500,6 +507,7 @@ function renderThumbnails() {
       thumb.type = "button";
       thumb.className = "thumb";
       thumb.dataset.page = String(pageNumber);
+      thumb.setAttribute("aria-label", `Go to page ${pageNumber}`);
       const label = document.createElement("span");
       label.textContent = String(pageNumber);
       if (state.document.kind === "pdf") {
@@ -557,7 +565,43 @@ async function renderPdfPreview(canvas, pageNumber) {
   canvas.getContext("2d").drawImage(buffer, 0, 0);
 }
 
+function captureTaskFocus() {
+  const active = document.activeElement;
+  const taskPane = document.querySelector(".task-pane");
+  if (!(active instanceof HTMLElement) || active === document.body || !taskPane?.contains(active)) return null;
+  const finding = active.closest(".finding");
+  if (finding?.dataset.findingId) {
+    if (active.matches("input[type='checkbox']")) return { kind: "finding-checkbox", id: finding.dataset.findingId };
+    if (active.matches("[data-action='restore']")) return { kind: "finding-restore", id: finding.dataset.findingId };
+  }
+  const fieldButton = active.closest("[data-field-name]");
+  if (fieldButton?.dataset.fieldName) return { kind: "structured-field", field: fieldButton.dataset.fieldName };
+  if (active.id) return { kind: "id", id: active.id };
+  return null;
+}
+
+function restoreTaskFocus(snapshot) {
+  if (!snapshot) return;
+  const findingControl = (id, selector) => [...document.querySelectorAll(selector)]
+    .find((element) => element.dataset.id === id);
+  let target;
+  if (snapshot.kind === "finding-checkbox") target = findingControl(snapshot.id, "#findingList input[type='checkbox']");
+  if (snapshot.kind === "finding-restore") {
+    target = findingControl(snapshot.id, "#findingList [data-action='restore']")
+      ?? findingControl(snapshot.id, "#findingList input[type='checkbox']");
+  }
+  if (snapshot.kind === "structured-field") {
+    target = [...document.querySelectorAll("#structuredFieldList [data-field-name]")]
+      .find((element) => element.dataset.fieldName === snapshot.field);
+  }
+  if (snapshot.kind === "id") target = $(snapshot.id);
+  if (target?.id === "redactButton" && target.disabled) target = $("verifyButton");
+  if (!target || target.disabled || target.hidden || target.closest("[hidden]")) return;
+  target.focus();
+}
+
 function render() {
+  const focus = captureTaskFocus();
   const findings = registry.all();
   const verified = Boolean(state.verification?.passed);
   $("processingBadge").textContent = verified ? "VERIFIED" : state.document ? "READY" : "NO DOCUMENT";
@@ -582,9 +626,14 @@ function render() {
     for (const finding of findings) {
       const row = document.createElement("div");
       row.className = `finding${finding.status === "redacted" ? " redacted" : ""}${finding.status === "excluded" ? " excluded" : ""}`;
+      row.setAttribute("role", "listitem");
       row.dataset.findingId = finding.id;
       row.dataset.page = finding.page || 1;
       row.innerHTML = `<input type="checkbox" data-id="${finding.id}" aria-label="Include ${finding.id} in the next redaction" ${finding.status === "redacted" ? "disabled" : ""} ${finding.status === "excluded" ? "" : "checked"} /><span class="finding-dot"></span><span class="finding-info"><strong>${escapeHtml(findingTypeLabel(finding.type))}</strong><small>${finding.id} · ${escapeHtml(finding.location || "local")}</small></span><span class="confidence">${finding.confidence.toFixed(2)}</span><span class="finding-actions">${finding.status === "pending" ? "" : `<span class="finding-tag">${finding.status}</span>`}${finding.status === "redacted" ? `<button class="finding-control" data-action="restore" data-id="${finding.id}">Restore</button>` : ""}</span>`;
+      row.querySelector("input[type='checkbox']").setAttribute(
+        "aria-label",
+        `Include ${findingTypeLabel(finding.type)}, ${finding.location || "local"}, in the next redaction`,
+      );
       list.append(row);
     }
   }
@@ -607,6 +656,7 @@ function render() {
   renderViewerChrome();
   renderThumbnails();
   renderPreview();
+  restoreTaskFocus(focus);
 }
 
 function renderCategorySummary(findings) {

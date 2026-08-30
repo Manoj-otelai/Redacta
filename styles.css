@@ -56,6 +56,7 @@ button, input, select, textarea { font: inherit; }
 
 :focus-visible { outline: 2px solid var(--iris); outline-offset: 1px; }
 .app-bar :focus-visible, .tool-rail :focus-visible, .status-bar :focus-visible { outline-color: #9a97ff; }
+.button-primary:focus-visible, .button-danger:focus-visible { outline-color: var(--paper); }
 
 * { scrollbar-width: thin; scrollbar-color: #c6c2bb transparent; }
 *::-webkit-scrollbar { width: 10px; height: 10px; }
@@ -195,7 +196,7 @@ button, input, select, textarea { font: inherit; }
 .pane-head {
   padding: 9px 12px;
   border-bottom: 1px solid var(--line);
-  color: var(--greige-2);
+  color: var(--greige);
   font: 500 11px var(--mono);
   letter-spacing: .14em;
   text-transform: uppercase;
@@ -357,7 +358,7 @@ button, input, select, textarea { font: inherit; }
 .viewer-empty p { margin: 0; max-width: 400px; color: var(--ink-muted); font-size: 13px; }
 .viewer-empty-actions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-top: 20px; }
 .viewer-empty-hint { margin-top: 12px !important; font-size: 12.5px; }
-.viewer-empty-formats { margin-top: 18px !important; color: var(--greige-2) !important; font: 500 10.5px var(--mono); letter-spacing: .14em; text-transform: uppercase; }
+.viewer-empty-formats { margin-top: 18px !important; color: var(--greige) !important; font: 500 10.5px var(--mono); letter-spacing: .14em; text-transform: uppercase; }
 
 /* -------------------------------------------------------------- task pane */
 
@@ -627,7 +628,7 @@ button, input, select, textarea { font: inherit; }
 .certificate-checks { display: grid; gap: 5px; margin: 0; padding: 0; list-style: none; color: var(--greige); font: 10.5px/1.4 var(--mono); }
 .certificate-checks li { display: flex; gap: 7px; }
 .certificate-checks li:before { content: "✓"; color: var(--teal); font-weight: 700; }
-.tiny-label { margin: 16px 0 7px; color: var(--greige-2); font: 500 10px var(--mono); letter-spacing: .14em; text-transform: uppercase; }
+.tiny-label { margin: 16px 0 7px; color: var(--greige); font: 500 10px var(--mono); letter-spacing: .14em; text-transform: uppercase; }
 .safe-list, .locked-list { margin: 0; padding: 0; list-style: none; display: grid; gap: 5px; }
 .safe-list li, .locked-list li { display: flex; gap: 8px; font-size: 12.5px; }
 .safe-list li:before { content: "✓"; color: var(--ok); }
@@ -657,9 +658,21 @@ button, input, select, textarea { font: inherit; }
 }
 .status-cell { display: flex; align-items: center; gap: 6px; }
 .status-cell strong { color: var(--chrome-text); font-family: var(--mono); font-weight: 600; }
-.status-cell.muted { color: rgba(255,255,255,.42); }
+.status-cell.muted { color: rgba(255,255,255,.48); }
 .status-spacer { flex: 1; }
 .status-dot.ok { width: 6px; height: 6px; box-shadow: none; }
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
 
 /* --------------------------------------------------------- toast & modal */
 
