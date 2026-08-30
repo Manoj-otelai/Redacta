@@ -749,12 +749,26 @@ img { display: block; max-width: 100%; }
   .nav-links { display: none; }
 }
 
+@media (max-width: 760px) {
+  .modeswitch {
+    right: 14px;
+    left: auto;
+    bottom: 18px;
+    transform: none;
+  }
+}
+
 @media (max-width: 620px) {
   .hero { padding-top: 56px; }
   .hero-actions { flex-direction: column; align-items: stretch; }
   .btn { justify-content: center; }
   .tool { grid-template-columns: minmax(0, 1fr); gap: 6px; }
   .guarantees-head { flex-direction: column; align-items: start; }
-  .modeswitch { bottom: 14px; }
+  .nav-inner { gap: 12px; }
+  .nav-cta { gap: 6px; min-width: 0; }
+  .nav-cta .btn-light { display: none; }
+  .foot-inner { flex-direction: column; align-items: flex-start; gap: 12px; }
+  .foot-links { flex-wrap: wrap; gap: 12px 18px; margin-left: 0; }
+  .modeswitch { right: 10px; bottom: 14px; }
   .mode { padding: 7px 12px; }
 }
