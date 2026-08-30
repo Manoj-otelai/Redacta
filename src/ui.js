@@ -62,9 +62,9 @@ const demoJson = JSON.stringify({
   },
 }, null, 2);
 const demoCsv = `employee_id,ssn,email,phone,card,integration_token,notes
-EMP-200001,456-78-9012,zoe.martin@northstar.example,(415) 555-0111,4012 8888 8888 1881,sk_live_51NORTHSTAR_5rs8d,"Contractor, part-time"
-EMP-200002,567-89-0123,noah.kim@northstar.example,(415) 555-0112,4222 2222 2222 2222,sk_live_51NORTHSTAR_6tu9e,"Full-time, remote"
-EMP-200003,678-90-1234,sofia.reyes@northstar.example,(415) 555-0113,3782 822463 10005,sk_live_51NORTHSTAR_7vw1f,"Finance, manager"
+EMP-200001,456-78-9012,zoe.martin@northstar.example,(415) 555-0111,4111 1111 1111 1111,sk_live_51NORTHSTAR_5rs8d,"Contractor, part-time"
+EMP-200002,567-89-0123,noah.kim@northstar.example,(415) 555-0112,4242 4242 4242 4242,sk_live_51NORTHSTAR_6tu9e,"Full-time, remote"
+EMP-200003,678-90-1234,sofia.reyes@northstar.example,(415) 555-0113,5555 5555 5555 4444,sk_live_51NORTHSTAR_7vw1f,"Finance, manager"
 EMP-200004,789-01-2345,eli.brooks@northstar.example,(415) 555-0114,6011 1111 1111 1117,sk_live_51NORTHSTAR_8xy2g,"Engineering, on-call"`;
 
 const loadDemoText = async () => loadDocument(await loadTextDocument(new File([demoText], "confidential-employment-contract.txt", { type: "text/plain" })));
@@ -451,6 +451,7 @@ function createPdfCanvas(preview) {
 function renderPreview() {
   const preview = $("documentPreview");
   if (!state.document) return;
+  preview.classList.toggle("is-csv", state.document.format === "csv");
   if (state.document.kind === "pdf") {
     if (!pdfCanvas || !preview.contains(pdfCanvas)) pdfCanvas = createPdfCanvas(preview);
     renderPdfPreview(pdfCanvas, state.pdfPage).catch(() => toast("Could not render the PDF preview."));
