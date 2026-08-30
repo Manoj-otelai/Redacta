@@ -772,3 +772,11 @@ img { display: block; max-width: 100%; }
   .modeswitch { right: 10px; bottom: 14px; }
   .mode { padding: 7px 12px; }
 }
+
+@media (max-width: 480px) {
+  .mode {
+    padding: 6px 10px;
+    font-size: 10px;
+  }
+  .radio { display: none; }
+}
