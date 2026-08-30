@@ -376,7 +376,7 @@ The production app is [https://redacta-theta.vercel.app/](https://redacta-theta.
 | `/ai.html` | [https://redacta-theta.vercel.app/ai.html](https://redacta-theta.vercel.app/ai.html) |
 | `/tools.html` | [https://redacta-theta.vercel.app/tools.html](https://redacta-theta.vercel.app/tools.html) |
 
-Fonts and landing artwork ship in `assets/`. Vercel (`vercel.json`) and Netlify (`netlify.toml`) publish the repository root as static files.
+Fonts and landing artwork ship in `assets/`. Vercel (`vercel.json`) publishes the repository root as static files.
 
 Open a local PDF, TXT, JSON, or CSV from the empty state, or click **Run agent demo** to load the synthetic contract. On JSON or CSV, the agent demo also lists structured fields and redacts one whole field before it continues.
 

@@ -6,7 +6,6 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const copies = [
   ["node_modules/pdfjs-dist/build/pdf.mjs", "vendor/pdfjs/pdf.mjs"],
   ["node_modules/pdfjs-dist/build/pdf.worker.mjs", "vendor/pdfjs/pdf.worker.mjs"],
-  ["node_modules/pdfjs-dist/build/pdf.sandbox.mjs", "vendor/pdfjs/pdf.sandbox.mjs"],
   ["node_modules/pdf-lib/dist/pdf-lib.esm.js", "vendor/pdf-lib/pdf-lib.esm.js"],
 ];
 await rm(resolve(root, "vendor"), { recursive: true, force: true });
