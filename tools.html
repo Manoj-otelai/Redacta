@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="description" content="Ten WebMCP tools that publish operations, not document contents — how Redacta registers them, projects findings, and verifies artifacts in the browser." />
+<title>Redacta · WebMCP tools</title>
+<link rel="icon" href="./assets/favicon.svg" type="image/svg+xml" />
+<link rel="stylesheet" href="./assets/fonts/fonts.css" />
+<link rel="stylesheet" href="./landing.css" />
+<link rel="alternate" type="text/html" href="./ai-tools.html" title="Machine readable" />
+</head>
+<body>
+
+<div class="announce">
+  <div>Built for the WebMCP Challenge — <a href="./app.html">open the workspace</a>, no upload, no account, no backend.</div>
+</div>
+
+<header class="nav">
+  <div class="wrap nav-inner">
+    <a class="brand" href="./"><span class="wordmark">redacta</span></a>
+    <nav class="nav-links">
+      <a href="./index.html#boundary">Privacy boundary</a>
+      <a href="./index.html#how">How it works</a>
+      <a href="./tools.html" aria-current="page">WebMCP tools</a>
+    </nav>
+    <div class="nav-cta">
+      <a class="btn btn-dark btn-sm" href="./app.html">Open the workspace</a>
+    </div>
+  </div>
+</header>
+
+<main>
+  <section class="page-hero">
+    <div class="wrap">
+      <h1 class="display">Ten tools. Capabilities, not contents.</h1>
+      <div class="hero-actions">
+        <a class="btn btn-dark" href="./app.html">Open the workspace</a>
+        <a class="btn btn-ghost" href="./app.html?demo=agent">Watch an agent run it →</a>
+      </div>
+    </div>
+  </section>
+
+  <section class="split" id="surface">
+    <div class="split-dark">
+      <p class="eyebrow">What this is</p>
+      <h2 class="display">The page publishes operations, not document contents.</h2>
+      <p>WebMCP is how Redacta talks to an agent without handing it the file. The agent does not scrape the DOM and it is not given the PDF. It is offered ten named operations — inspect, scan, redact, verify, export — and every answer is metadata. The tool API is the privacy boundary.</p>
+    </div>
+    <div class="split-light">
+      <p class="pane-label"><i class="sq"></i>src/ui.js · registerTools</p>
+      <pre class="payload">modelContext.registerTool({
+  <span class="k">name</span>,
+  <span class="k">description</span>: TOOL_DESCRIPTIONS[name],
+  <span class="k">inputSchema</span>: TOOL_SCHEMAS[name],
+  <span class="k">execute</span>: (input) =&gt; execute(name, input)
+});</pre>
+      <p class="snippet-note">Native WebMCP uses <code>document.modelContext</code> or <code>navigator.modelContext</code>. Missing either, Demo Mode puts the same ten functions on <code>window</code>.</p>
+    </div>
+  </section>
+
+  <section class="build" id="built">
+    <div class="wrap">
+      <div class="build-head">
+        <p class="eyebrow">How it is built</p>
+        <h2 class="display">The boundary is code, not a promise</h2>
+        <p class="lede">Registration, schemas, projection, confirmation, the Demo Mode fallback, and verification are six separate pieces. None of them return document text.</p>
+      </div>
+      <div class="build-grid">
+        <article class="build-item">
+          <p class="file">src/ui.js</p>
+          <h3>Register the ten tools</h3>
+          <p><code>registerTools()</code> looks for <code>document.modelContext.registerTool</code>, then <code>navigator.modelContext.registerTool</code>. Each tool is registered with <code>name</code>, <code>description</code>, <code>inputSchema</code>, and <code>execute</code>. Agent calls go through <code>executeTool(name, input, "agent")</code>.</p>
+        </article>
+        <article class="build-item">
+          <p class="file">src/tools.js</p>
+          <h3>Schemas that refuse contents</h3>
+          <p><code>TOOL_SCHEMAS</code> and <code>TOOL_DESCRIPTIONS</code> live next to the implementations. Every description states the tool never returns document contents or sensitive values. The execute functions return counts, IDs, and projected rows — not matched strings.</p>
+        </article>
+        <article class="build-item">
+          <p class="file">src/registry.js</p>
+          <h3>A fixed whitelist</h3>
+          <p>Raw detector hits stay in an in-memory registry. Anything that crosses to the agent is projected through <code>SAFE_FIELDS</code>: <code>id</code>, <code>type</code>, <code>confidence</code>, <code>status</code>, <code>origin</code>, <code>page</code>. Values, locations, and offsets are not on that list.</p>
+        </article>
+        <article class="build-item">
+          <p class="file">src/ui.js · requestConfirmation</p>
+          <h3>Mutations stop for a human</h3>
+          <p>When <code>callSource</code> is <code>agent</code>, <code>applyRedactions</code>, <code>exportSanitizedDocument</code>, <code>registerCustomPattern</code>, and <code>redactField</code> call in-page <code>requestConfirmation</code>. Deny, or wait out the minute, and the tool returns <code>denied</code> — nothing is changed.</p>
+        </article>
+        <article class="build-item">
+          <p class="file">Demo Mode</p>
+          <h3>Same tools without the flag</h3>
+          <p>If native WebMCP is missing, the status chip reads Demo Mode. The same ten functions are assigned onto <code>window</code> and callable from the Console pane. Same schemas, same projection, same confirmation gate.</p>
+        </article>
+        <article class="build-item">
+          <p class="file">src/verify.js · src/tools.js</p>
+          <h3>Three checks on the bytes</h3>
+          <p>Verification re-reads the generated artifact. It reports <code>extractableFindings</code> (detectors still fire), <code>unmaskedRegions</code> (findings still pending), and <code>originalValuesFound</code> (raw strings still appear). Export stays blocked until all three are zero, then re-checks the SHA-256 digest.</p>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <section class="catalog" id="catalog">
+    <div class="wrap">
+      <div class="catalog-head">
+        <p class="eyebrow">The ten tools</p>
+        <h2 class="display">What the agent gets. What it never gets.</h2>
+        <p class="lede">Each tool is a capability. The privacy punch is in the return value — metadata only, every time.</p>
+      </div>
+      <div class="tool-cards">
+        <article class="tool-card">
+          <div>
+            <code class="tool-name">inspectDocument</code>
+          </div>
+          <div>
+            <p>A status check, not a read. Reports what is loaded the way a librarian will tell you the shelf and the page count without opening the book.</p>
+            <p class="punch"><b>Gets</b> fileType, filename, documentSize, pageCount, processingStatus. <b>Never</b> a character of the document.</p>
+          </div>
+        </article>
+        <article class="tool-card">
+          <div>
+            <code class="tool-name">scanDocumentPII</code>
+          </div>
+          <div>
+            <p>Runs the local detectors — optionally scoped to categories — in a Web Worker. Hits are stored in the registry; the agent only sees the projected rows.</p>
+            <p class="punch"><b>Gets</b> totalDetected and findings with id, type, confidence, status, origin, page. <b>Never</b> matched values, locations, or offsets.</p>
+          </div>
+        </article>
+        <article class="tool-card">
+          <div>
+            <code class="tool-name">getFindingDetails</code>
+          </div>
+          <div>
+            <p>One finding, by id, through the same whitelist. Use it when the agent needs a single row, not another full scan.</p>
+            <p class="punch"><b>Gets</b> type, confidence, status, origin, page. <b>Never</b> the value, location, or character offsets.</p>
+          </div>
+        </article>
+        <article class="tool-card">
+          <div>
+            <code class="tool-name">applyRedactions</code>
+            <span class="gate">Human approval</span>
+          </div>
+          <div>
+            <p>Marks selected findings redacted and builds a sanitized artifact locally. Agent-initiated calls open an in-page confirmation and wait.</p>
+            <p class="punch"><b>Gets</b> totalRedacted, maskMode, projected findings. <b>Never</b> document contents or the masked strings.</p>
+          </div>
+        </article>
+        <article class="tool-card">
+          <div>
+            <code class="tool-name">verifyRedaction</code>
+          </div>
+          <div>
+            <p>Re-reads the generated file. App state is not treated as proof. A rasterized PDF has no text layer, so a text rescan alone would lie — that is why coverage and original-value checks exist.</p>
+            <p class="punch"><b>Gets</b> passed, remainingFindings, extractableFindings, unmaskedRegions, originalValuesFound, per-category counts. <b>Never</b> remaining values or document text.</p>
+          </div>
+        </article>
+        <article class="tool-card">
+          <div>
+            <code class="tool-name">exportSanitizedDocument</code>
+            <span class="gate">Human approval · blocked until verify</span>
+          </div>
+          <div>
+            <p>Starts a local download of the verified artifact. Blocked if verification has not passed, or if the digest no longer matches the file still in memory.</p>
+            <p class="punch"><b>Gets</b> filename, size, verified: true. <b>Never</b> the file bytes in the tool response.</p>
+          </div>
+        </article>
+        <article class="tool-card">
+          <div>
+            <code class="tool-name">getVerificationCertificate</code>
+          </div>
+          <div>
+            <p>Metadata-only proof for a passing artifact: an <code>RDCT-…</code> id, SHA-256 digest, issued time, and the numeric checks. Stale artifacts are rejected.</p>
+            <p class="punch"><b>Gets</b> certificateId, digest, document metadata, check counts. <b>Never</b> document contents or finding values.</p>
+          </div>
+        </article>
+        <article class="tool-card">
+          <div>
+            <code class="tool-name">registerCustomPattern</code>
+            <span class="gate">Human approval</span>
+          </div>
+          <div>
+            <p>Validates a regex, then registers it as a local detector (max 5). Unsafe, empty, or slow patterns are rejected before the confirmation appears.</p>
+            <p class="punch"><b>Gets</b> name, totalPatterns. <b>Never</b> document contents or the strings the pattern later matches.</p>
+          </div>
+        </article>
+        <article class="tool-card">
+          <div>
+            <code class="tool-name">listStructuredFields</code>
+          </div>
+          <div>
+            <p>JSON and CSV only. Lists keys or columns with how often they occur and how many detections overlap them — enough to choose a field, not enough to read it.</p>
+            <p class="punch"><b>Gets</b> format and fields[{field, occurrences, detectedFindings}]. <b>Never</b> cell or leaf values.</p>
+          </div>
+        </article>
+        <article class="tool-card">
+          <div>
+            <code class="tool-name">redactField</code>
+            <span class="gate">Human approval</span>
+          </div>
+          <div>
+            <p>Redacts every string value of one JSON key or CSV column so the artifact stays valid structured data. Agent-initiated calls wait for confirmation.</p>
+            <p class="punch"><b>Gets</b> field, valuesRedacted, redactedIds, totalRedacted, projected findings. <b>Never</b> the values that were redacted.</p>
+          </div>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <section class="try" id="try">
+    <div class="wrap try-grid">
+      <div>
+        <p class="eyebrow">How to try it</p>
+        <h2 class="display">Same tools in ChatGPT, Chrome, or the Console</h2>
+        <p class="lede">Nothing is uploaded. If native WebMCP is missing, Demo Mode is the same surface with a different doorbell.</p>
+        <div class="hero-actions">
+          <a class="btn btn-dark" href="./app.html">Open the workspace</a>
+          <a class="btn btn-ghost" href="https://github.com/Manoj-otelai/Redacta">Read the source</a>
+        </div>
+      </div>
+      <ol class="try-list">
+        <li>
+          <span class="n">01</span>
+          <p>Open the workspace in <b>ChatGPT’s in-app browser</b> (WebMCP on by default), or in <b>Chrome 149+</b> with <code>chrome://flags/#enable-webmcp-testing</code> enabled — then restart Chrome.</p>
+        </li>
+        <li>
+          <span class="n">02</span>
+          <p>Go to <a href="./app.html">app.html</a>. No account. No backend.</p>
+        </li>
+        <li>
+          <span class="n">03</span>
+          <p>Load <b>Demo PDF</b> from the File menu — or TXT, JSON, or CSV. The file stays in the tab.</p>
+        </li>
+        <li>
+          <span class="n">04</span>
+          <p>Click <b>Run agent demo</b>, or open the <b>Console</b> pane and call the tools yourself. With native WebMCP, paste the Agent-pane prompt into ChatGPT.</p>
+        </li>
+        <li>
+          <span class="n">05</span>
+          <p>Mutating calls — <code>applyRedactions</code>, <code>exportSanitizedDocument</code>, <code>registerCustomPattern</code>, <code>redactField</code> — stop for an in-page confirmation. Export stays locked until the three byte checks pass.</p>
+        </li>
+      </ol>
+    </div>
+  </section>
+
+  <section class="cta">
+    <div class="hero-art hero-art-left" aria-hidden="true">
+      <picture>
+        <source srcset="./assets/img/art-hero-right.webp" type="image/webp" />
+        <img src="./assets/img/art-hero-right.jpg" alt="" loading="lazy" decoding="async" />
+      </picture>
+    </div>
+    <div class="hero-art hero-art-right" aria-hidden="true">
+      <picture>
+        <source srcset="./assets/img/art-hero-left.webp" type="image/webp" />
+        <img src="./assets/img/art-hero-left.jpg" alt="" loading="lazy" decoding="async" />
+      </picture>
+    </div>
+    <div class="wrap">
+      <h2 class="display">Bring a confidential file.<br />Keep it confidential.</h2>
+      <p class="lede">Drop in a PDF, TXT, JSON or CSV — or load the synthetic contract and let the agent drive the whole run: scan, redact, verify, export.</p>
+      <div class="hero-actions">
+        <a class="btn btn-dark" href="./app.html">Open the workspace</a>
+        <a class="btn btn-ghost" href="./app.html?demo=agent">Watch an agent run it →</a>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer class="foot">
+  <div class="wrap foot-inner">
+    <a class="brand" href="./"><span class="wordmark">redacta</span></a>
+  </div>
+</footer>
+
+<div class="modeswitch" role="group" aria-label="Page mode">
+  <span class="mode is-on" aria-current="page"><i class="radio"></i>HUMAN</span>
+  <a class="mode" href="./ai-tools.html"><i class="radio"></i>MACHINE</a>
+</div>
+
+</body>
+</html>

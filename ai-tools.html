@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="description" content="Machine-readable Redacta WebMCP tools: how the ten tools are built, what they return, and what they never return." />
+<title>Redacta · WebMCP tools · machine readable</title>
+<link rel="icon" href="./assets/favicon.svg" type="image/svg+xml" />
+<link rel="alternate" type="text/html" href="./tools.html" title="Human readable" />
+<link rel="stylesheet" href="./assets/fonts/fonts.css" />
+<link rel="stylesheet" href="./machine.css" />
+</head>
+<body>
+
+<div class="col">
+
+  <section class="blk">
+    <div class="blk-body"><pre><span class="m-heading m-h1"><span class="m-hash">#</span> redacta / WebMCP tools</span>
+
+Machine rendering of <a href="./tools.html">redacta/tools.html</a>. Landing twin: <a href="./ai.html">./ai.html</a>.
+
+The page publishes operations, not document contents. The document never
+leaves the tab — and the agent never receives it.
+
+<span class="m-label">[Open the workspace]</span>(<a href="./app.html">./app.html</a>)
+<span class="m-label">[Watch an agent run it]</span>(<a href="./app.html?demo=agent">./app.html?demo=agent</a>)
+<span class="m-label">[Human page]</span>(<a href="./tools.html">./tools.html</a>)
+<span class="m-label">[Landing, machine]</span>(<a href="./ai.html">./ai.html</a>)</pre></div>
+    <button class="copy" type="button" title="Copy this block">copy</button>
+  </section>
+
+  <section class="blk" id="surface">
+    <div class="blk-body"><pre><span class="m-heading m-h2"><span class="m-hash">##</span> What WebMCP is doing here</span>
+
+WebMCP is how Redacta talks to an agent without handing it the file. The
+agent does not scrape the DOM and it is not given the PDF. It is offered
+ten named operations — inspect, scan, redact, verify, export — and every
+answer is metadata. The tool API is the privacy boundary.</pre></div>
+    <button class="copy" type="button" title="Copy this block">copy</button>
+  </section>
+
+  <section class="blk" id="built">
+    <div class="blk-body"><pre><span class="m-heading m-h2"><span class="m-hash">##</span> How it is built</span>
+
+<span class="m-heading m-h3"><span class="m-hash">###</span> Registration — src/ui.js</span>
+registerTools() looks for document.modelContext.registerTool, then
+navigator.modelContext.registerTool. Each tool is registered with name,
+description, inputSchema, and execute. Agent calls go through
+executeTool(name, input, "agent").
+
+modelContext.registerTool({
+  name,
+  description: TOOL_DESCRIPTIONS[name],
+  inputSchema: TOOL_SCHEMAS[name],
+  execute: (input) => execute(name, input)
+});
+
+<span class="m-heading m-h3"><span class="m-hash">###</span> Schemas — src/tools.js</span>
+TOOL_SCHEMAS and TOOL_DESCRIPTIONS live next to the implementations.
+Every description states the tool never returns document contents or
+sensitive values.
+
+<span class="m-heading m-h3"><span class="m-hash">###</span> Privacy projection — src/registry.js</span>
+Raw detector hits stay in an in-memory registry. Anything that crosses
+to the agent is projected through SAFE_FIELDS:
+  id, type, confidence, status, origin, page
+Values, locations, and offsets are not on that list.
+
+<span class="m-heading m-h3"><span class="m-hash">###</span> Confirmation — src/ui.js requestConfirmation</span>
+When callSource is "agent", applyRedactions, exportSanitizedDocument,
+registerCustomPattern, and redactField call in-page requestConfirmation.
+Deny, or wait out the minute, and the tool returns denied.
+
+<span class="m-heading m-h3"><span class="m-hash">###</span> Demo Mode fallback</span>
+If native WebMCP is missing, the same ten functions are assigned onto
+window and callable from the Console pane. Same schemas, same projection,
+same confirmation gate.
+
+<span class="m-heading m-h3"><span class="m-hash">###</span> Verification — src/verify.js</span>
+Verification re-reads the generated artifact bytes and reports three
+independent checks:
+  extractableFindings   detectors still fire on the artifact
+  unmaskedRegions       findings still marked pending
+  originalValuesFound   original raw strings still appear
+Export is blocked until all three are zero. Export then re-checks the
+SHA-256 digest so a file changed after verification cannot download as
+verified.</pre></div>
+    <button class="copy" type="button" title="Copy this block">copy</button>
+  </section>
+
+  <section class="blk" id="catalog">
+    <div class="blk-body"><pre><span class="m-heading m-h2"><span class="m-hash">##</span> The ten tools — what the agent gets vs never gets</span>
+
+<span class="m-signature">inspectDocument({})</span>
+  Status check, not a read.
+  Gets: fileType, filename, documentSize, pageCount, processingStatus.
+  Never: a character of the document.
+
+<span class="m-signature">scanDocumentPII({categories?})</span>
+  Local detectors, optional category scope, Web Worker.
+  Gets: totalDetected, findings[{id, type, confidence, status, origin, page}].
+  Never: matched values, locations, or offsets.
+
+<span class="m-signature">getFindingDetails({findingId})</span>
+  One finding, same whitelist.
+  Gets: type, confidence, status, origin, page.
+  Never: value, location, or character offsets.
+
+<span class="m-signature">applyRedactions({targetIds?, maskMode?})</span>
+  Marks findings redacted and builds a local artifact.
+  Requires human approval when callSource is agent.
+  Gets: totalRedacted, maskMode, projected findings.
+  Never: document contents or the masked strings.
+
+<span class="m-signature">verifyRedaction({categories?})</span>
+  Re-reads artifact bytes. App state is not proof.
+  Gets: passed, remainingFindings, extractableFindings, unmaskedRegions,
+        originalValuesFound, per-category counts.
+  Never: remaining values or document text.
+
+<span class="m-signature">exportSanitizedDocument({filename?})</span>
+  Local download of the verified artifact.
+  Requires human approval. Blocked until verification passes.
+  Gets: filename, size, verified: true.
+  Never: the file bytes in the tool response.
+
+<span class="m-signature">getVerificationCertificate({})</span>
+  Metadata-only proof for a passing artifact (RDCT-… id, digest, counts).
+  Gets: certificateId, digest, document metadata, check counts.
+  Never: document contents or finding values.
+
+<span class="m-signature">registerCustomPattern({name, pattern, flags?})</span>
+  Validates a regex, registers a local detector (max 5).
+  Requires human approval. Unsafe / empty / slow patterns are rejected first.
+  Gets: name, totalPatterns.
+  Never: document contents or later match values.
+
+<span class="m-signature">listStructuredFields({})</span>
+  JSON keys or CSV columns only.
+  Gets: format, fields[{field, occurrences, detectedFindings}].
+  Never: cell or leaf values.
+
+<span class="m-signature">redactField({field, maskMode?})</span>
+  Redacts every string value of one JSON key or CSV column.
+  Requires human approval.
+  Gets: field, valuesRedacted, redactedIds, totalRedacted, projected findings.
+  Never: the values that were redacted.
+
+agent prompt to try:
+  Inspect this document, scan it for SSNs, credit cards, emails and API keys,
+  redact every finding, verify the sanitized copy, then export it. If the file is
+  JSON or CSV, list its structured fields and redact the whole records[].card key.</pre></div>
+    <button class="copy" type="button" title="Copy this block">copy</button>
+  </section>
+
+  <section class="blk" id="try">
+    <div class="blk-body"><pre><span class="m-heading m-h2"><span class="m-hash">##</span> How to try it</span>
+
+1. ChatGPT in-app browser (WebMCP on by default), or Chrome 149+ with
+   chrome://flags/#enable-webmcp-testing enabled, then restart Chrome.
+2. Open <a href="./app.html">./app.html</a>. No account. No backend.
+3. Load Demo PDF (or TXT / JSON / CSV) from the File menu.
+4. Click Run agent demo, or use the Console pane. With native WebMCP,
+   paste the Agent-pane prompt into ChatGPT.
+5. Mutating calls stop for in-page confirmation. Export stays locked
+   until extractableFindings, unmaskedRegions, and originalValuesFound
+   are all zero.
+
+<span class="m-label">[Open the workspace]</span>(<a href="./app.html">./app.html</a>)
+<span class="m-label">[Watch an agent run it]</span>(<a href="./app.html?demo=agent">./app.html?demo=agent</a>)
+<span class="m-label">[Read the source]</span>(<a href="https://github.com/Manoj-otelai/Redacta">https://github.com/Manoj-otelai/Redacta</a>)</pre></div>
+    <button class="copy" type="button" title="Copy this block">copy</button>
+  </section>
+
+</div>
+
+<div class="modeswitch" role="group" aria-label="Page mode">
+  <a class="mode" href="./tools.html"><i class="radio"></i>HUMAN</a>
+  <span class="mode is-on" aria-current="page"><i class="radio"></i>MACHINE</span>
+</div>
+
+<script>
+document.querySelectorAll(".copy").forEach((btn) => {
+  btn.addEventListener("click", async () => {
+    const text = btn.parentElement.querySelector("pre").innerText;
+    try {
+      await navigator.clipboard.writeText(text);
+      btn.textContent = "copied";
+    } catch {
+      btn.textContent = "failed";
+    }
+    setTimeout(() => { btn.textContent = "copy"; }, 1400);
+  });
+});
+</script>
+
+</body>
+</html>

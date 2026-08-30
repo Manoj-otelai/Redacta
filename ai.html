@@ -31,11 +31,12 @@ rendering of <a href="./index.html">redacta/index.html</a> — same content, no 
   <span class="m-label">[Workspace]</span>(<a href="./app.html">./app.html</a>)
   <span class="m-label">[Agent demo run]</span>(<a href="./app.html?demo=agent">./app.html?demo=agent</a>)
   <span class="m-label">[Landing page, human]</span>(<a href="./index.html">./index.html</a>)
+  <span class="m-label">[WebMCP tools, human]</span>(<a href="./tools.html">./tools.html</a>)
+  <span class="m-label">[WebMCP tools, machine]</span>(<a href="./ai-tools.html">./ai-tools.html</a>)
 <span class="m-section-label">Sections:</span>
   <span class="m-label">[Privacy boundary]</span>(<a href="#boundary">#boundary</a>)
   <span class="m-label">[How it works]</span>(<a href="#how">#how</a>)
-  <span class="m-label">[Guarantees]</span>(<a href="#guarantees">#guarantees</a>)
-  <span class="m-label">[WebMCP tools]</span>(<a href="#tools">#tools</a>)
+  <span class="m-label">[WebMCP tools]</span>(<a href="./ai-tools.html">./ai-tools.html</a>)
 <span class="m-section-label">Source:</span>
   <span class="m-label">[Repository]</span>(<a href="https://github.com/Manoj-otelai/Redacta">https://github.com/Manoj-otelai/Redacta</a>)
   <span class="m-label">[README]</span>(<a href="https://github.com/Manoj-otelai/Redacta/blob/main/README.md">https://github.com/Manoj-otelai/Redacta#readme</a>)
@@ -47,13 +48,9 @@ rendering of <a href="./index.html">redacta/index.html</a> — same content, no 
   </section>
 
   <section class="blk">
-    <div class="blk-body"><pre><span class="m-heading m-h1"><span class="m-hash">#</span> Let agents work on documents they are never allowed to read</span>
+    <div class="blk-body"><pre><span class="m-heading m-h1"><span class="m-hash">#</span> Agents work on documents they cannot read</span>
 
-Redacta finds the sensitive data in a confidential file, masks it, and proves
-it is gone — entirely inside your browser. WebMCP hands your agent the
-controls, never the contents.
-
-PDF · TXT · JSON · CSV — 0 bytes uploaded
+Finds, masks, and proves data is gone — in your browser, never the agent.
 
   0  bytes of your document uploaded
  10  WebMCP tools registered
@@ -114,65 +111,6 @@ result: extractable: 0 · unmasked regions: 0 · original values: 0 · export un
     <button class="copy" type="button" title="Copy this block">copy</button>
   </section>
 
-  <section class="blk" id="guarantees">
-    <div class="blk-body"><pre><span class="m-heading m-h2"><span class="m-hash">##</span> Guarantees — enforced in code, visible in the interface</span>
-
-- Local-only processing. Parsing, detection, masking, verification and export
-  all run in the page. Nothing is posted to a server.
-- No values in tool results. A fixed safe-field whitelist projects every
-  finding; raw matches stay in a private in-memory registry.
-- Human approval to mutate. Agent-requested redaction and export both stop for
-  an in-page confirmation with a visible timeout.
-- Byte-level verification. The exported artifact is rescanned, and mask
-  coverage is checked separately — app state is never treated as proof.
-- Verified-only export. Failed verification blocks the download and says how
-  many findings remain. Redacta never claims a file is clean when it isn't.
-- Measured network activity. A live counter reports outbound requests made by
-  the page. During a full demo run it stays at zero.</pre></div>
-    <button class="copy" type="button" title="Copy this block">copy</button>
-  </section>
-
-  <section class="blk" id="tools">
-    <div class="blk-body"><pre><span class="m-heading m-h2"><span class="m-hash">##</span> WebMCP surface — ten tools, capabilities not contents</span>
-
-Registered on document.modelContext or navigator.modelContext when native WebMCP is available, with a
-Demo Mode console when it isn't — the same tools, the same boundary.
-
-<span class="m-signature">inspectDocument({})</span>
-  → fileType, pageCount, documentSize, processingStatus.  No text.
-<span class="m-signature">scanDocumentPII({categories?})</span>
-  → totalDetected, findings[{id, type, confidence, status, origin, page}].
-    No matched values.
-<span class="m-signature">getFindingDetails({findingId})</span>
-  → one projected finding: category, confidence, status, origin and page.
-    No value, location or offsets.
-<span class="m-signature">applyRedactions({targetIds?, maskMode?})</span>
-  → totalRedacted.  Requires human approval.
-<span class="m-signature">verifyRedaction({categories?})</span>
-  → passed, remainingFindings, extractableFindings, unmaskedRegions,
-    per-category counts, syntheticPlaceholders, originalValuesFound.
-<span class="m-signature">exportSanitizedDocument({filename?})</span>
-  → filename, verified.  Blocked until verification passes.
-
-<span class="m-signature">getVerificationCertificate({})</span>
-  metadata-only certificate for a verified artifact.  No contents or values.
-<span class="m-signature">registerCustomPattern({name, pattern, flags?})</span>
-  &rarr; validates and registers a local detector.  Requires human approval.
-
-  results expose counts and metadata only, never contents or values.
-<span class="m-signature">listStructuredFields({})</span>
-  &rarr; lists JSON keys or CSV columns with occurrence counts only.
-<span class="m-signature">redactField({field, maskMode?})</span>
-  &rarr; redacts one JSON key or CSV column locally.  Requires human approval.
-    Only string JSON leaves and CSV cells are redactable.
-
-agent prompt to try:
-  Inspect this document, scan it for SSNs, credit cards, emails and API keys,
-  redact every finding, verify the sanitized copy, then export it. If the file is
-  JSON or CSV, list its structured fields and redact the whole records[].card key.</pre></div>
-    <button class="copy" type="button" title="Copy this block">copy</button>
-  </section>
-
   <section class="blk">
     <div class="blk-body"><pre>"The agent knows there are seven SSNs. It never knows what those SSNs are."
 
@@ -183,6 +121,7 @@ agent drive the whole run: scan, redact, verify, export.
 
 <span class="m-label">[Open the workspace]</span>(<a href="./app.html">./app.html</a>)
 <span class="m-label">[Watch an agent run it]</span>(<a href="./app.html?demo=agent">./app.html?demo=agent</a>)
+<span class="m-label">[WebMCP tools]</span>(<a href="./ai-tools.html">./ai-tools.html</a>)
 <span class="m-label">[Read the source]</span>(<a href="https://github.com/Manoj-otelai/Redacta">https://github.com/Manoj-otelai/Redacta</a>)</pre></div>
     <button class="copy" type="button" title="Copy this block">copy</button>
   </section>

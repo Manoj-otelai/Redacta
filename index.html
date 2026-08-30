@@ -22,11 +22,9 @@
     <nav class="nav-links">
       <a href="#boundary">Privacy boundary</a>
       <a href="#how">How it works</a>
-      <a href="#tools">WebMCP tools</a>
-      <a href="#guarantees">Guarantees</a>
+      <a href="./tools.html">WebMCP tools</a>
     </nav>
     <div class="nav-cta">
-      <a class="btn btn-light btn-sm" href="https://github.com/Manoj-otelai/Redacta">GitHub</a>
       <a class="btn btn-dark btn-sm" href="./app.html">Open the workspace</a>
     </div>
   </div>
@@ -47,13 +45,12 @@
       </picture>
     </div>
     <div class="wrap">
-      <h1 class="display">Let agents work on documents<br />they are never allowed to read</h1>
-      <p class="lede">Redacta finds the sensitive data in a confidential file, masks it, and proves it is gone — entirely inside your browser. WebMCP hands your agent the controls, never the contents.</p>
+      <h1 class="display">Agents work on documents they cannot read</h1>
+      <p class="lede">Finds, masks, and proves data is gone — in your browser, never the agent.</p>
       <div class="hero-actions">
         <a class="btn btn-dark" href="./app.html">Open the workspace</a>
         <a class="btn btn-ghost" href="./app.html?demo=agent">Watch an agent run it →</a>
       </div>
-      <p class="hero-note">PDF · TXT · JSON · CSV — 0 bytes uploaded</p>
 
       <div class="preview">
         <div class="preview-bar">
@@ -113,7 +110,7 @@
       <p class="eyebrow">Privacy boundary</p>
       <h2 class="display">The agent orchestrates. The browser executes.</h2>
       <p>Redacta splits the work in two. Your agent decides what should happen — scan these categories, redact these findings, verify, export. The browser does all of it locally and answers with metadata only, so the values that made the document confidential never cross the boundary.</p>
-      <a class="textlink" href="#tools">See what each tool returns →</a>
+      <a class="textlink" href="./tools.html">See what each tool returns →</a>
     </div>
     <div class="split-light">
       <div class="boundary-card can">
@@ -189,73 +186,10 @@
           <div class="feature-body">
             <h3>Proof taken from the artifact, not the UI</h3>
             <p>Verification re-reads the generated file and rescans its bytes, checks that no original detected value survives, and separately checks that every detected region is covered. All three must pass before export unlocks.</p>
-            <a class="textlink" href="#guarantees">Read the guarantees →</a>
+            <a class="textlink" href="./app.html">Verify a sanitized copy →</a>
           </div>
           <p class="feature-proof">Export re-checks the artifact digest, so a file that changed after verification can't be downloaded as verified.</p>
         </article>
-      </div>
-    </div>
-  </section>
-
-  <section class="guarantees" id="guarantees">
-    <div class="wrap">
-      <div class="guarantees-head">
-        <div>
-          <p class="eyebrow">Guarantees</p>
-          <h2 class="display">Enforced in code, visible in the interface</h2>
-        </div>
-        <a class="btn btn-invert" href="./app.html">Open the workspace</a>
-      </div>
-      <div class="guarantee-grid">
-        <div class="guarantee">
-          <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="4" y="10" width="16" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg></div>
-          <p><strong>Local-only processing.</strong> Parsing, detection, masking, verification and export all run in the page. Nothing is posted to a server.</p>
-        </div>
-        <div class="guarantee">
-          <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 3 4 6v6c0 4.4 3.2 7.6 8 9 4.8-1.4 8-4.6 8-9V6z"/><path d="M9 12l2.2 2.2L15.5 10"/></svg></div>
-          <p><strong>No values in tool results.</strong> A fixed safe-field whitelist projects every finding; raw matches stay in a private in-memory registry.</p>
-        </div>
-        <div class="guarantee">
-          <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="8" r="3.2"/><path d="M5 20c0-3.6 3.1-5.6 7-5.6s7 2 7 5.6"/></svg></div>
-          <p><strong>Human approval to mutate.</strong> Agent-requested redaction and export both stop for an in-page confirmation with a visible timeout.</p>
-        </div>
-        <div class="guarantee">
-          <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M6 3h9l4 4v14H6z"/><path d="M9 13h6M9 17h4"/></svg></div>
-          <p><strong>Byte-level verification.</strong> The exported artifact is rescanned, and mask coverage is checked separately — app state is never treated as proof.</p>
-        </div>
-        <div class="guarantee">
-          <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 4v9m0 0-3.2-3.2M12 13l3.2-3.2"/><path d="M4 16v3h16v-3"/></svg></div>
-          <p><strong>Verified-only export.</strong> Failed verification blocks the download and says how many findings remain. Redacta never claims a file is clean when it isn't.</p>
-        </div>
-        <div class="guarantee">
-          <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="8"/><path d="M4 12h16M12 4c2.6 2.4 2.6 13.2 0 16-2.6-2.8-2.6-13.6 0-16z"/></svg></div>
-          <p><strong>Measured network activity.</strong> A live counter reports outbound requests made by the page. During a full demo run it stays at zero.</p>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <section class="tools" id="tools">
-    <div class="wrap tools-grid">
-      <div>
-        <p class="eyebrow">WebMCP surface</p>
-        <h2 class="display">Ten tools. Capabilities, not contents.</h2>
-        <p class="lede">Registered on <code>document.modelContext</code> or <code>navigator.modelContext</code> when native WebMCP is available, with a Demo Mode console when it isn't — the same tools, the same boundary.</p>
-        <div class="hero-actions" style="justify-content:flex-start">
-          <a class="btn btn-light" href="https://github.com/Manoj-otelai/Redacta">Read the source</a>
-        </div>
-      </div>
-      <div class="tool-list">
-        <div class="tool"><code>inspectDocument</code><p>File type, page count, size, readiness. <b>No text.</b></p></div>
-        <div class="tool"><code>scanDocumentPII</code><p>Counts, IDs, categories, confidence, status and page numbers. <b>No matched values or locations.</b></p></div>
-        <div class="tool"><code>getFindingDetails</code><p>One projected finding — category, confidence, status and page. <b>No value, location or offsets.</b></p></div>
-        <div class="tool"><code>applyRedactions</code><p>Masks the selected findings locally. <b>Requires human approval.</b></p></div>
-        <div class="tool"><code>verifyRedaction</code><p>Rescans artifact bytes and mask coverage, including original-value absence. <b>Returns pass or fail, per category.</b></p></div>
-        <div class="tool"><code>exportSanitizedDocument</code><p>Downloads the sanitized copy. <b>Blocked until verification passes.</b></p></div>
-        <div class="tool"><code>getVerificationCertificate</code><p>Returns metadata-only proof for a verified artifact. <b>Never includes document contents or values.</b></p></div>
-        <div class="tool"><code>registerCustomPattern</code><p>Registers a local detector from a validated pattern. <b>Requires human approval; returns counts and metadata only.</b></p></div>
-        <div class="tool"><code>listStructuredFields</code><p>Lists JSON keys or CSV columns with occurrence counts. <b>Never returns contents or values.</b></p></div>
-        <div class="tool"><code>redactField</code><p>Redacts every value of one JSON key or CSV column locally. <b>Requires human approval.</b></p></div>
       </div>
     </div>
   </section>
@@ -282,7 +216,6 @@
     </div>
     <div class="wrap">
       <h2 class="display">Bring a confidential file.<br />Keep it confidential.</h2>
-      <p class="lede">Drop in a PDF, TXT, JSON or CSV — or load the synthetic contract and let the agent drive the whole run: scan, redact, verify, export.</p>
       <div class="hero-actions">
         <a class="btn btn-dark" href="./app.html">Open the workspace</a>
         <a class="btn btn-ghost" href="./app.html?demo=agent">Watch an agent run it →</a>
@@ -294,12 +227,6 @@
 <footer class="foot">
   <div class="wrap foot-inner">
     <a class="brand" href="./"><span class="wordmark">redacta</span></a>
-    <span>The WebMCP-native privacy boundary for AI agents.</span>
-    <div class="foot-links">
-      <a href="./app.html">Workspace</a>
-      <a href="https://github.com/Manoj-otelai/Redacta">GitHub</a>
-      <a href="#boundary">Privacy boundary</a>
-    </div>
   </div>
 </footer>
 
