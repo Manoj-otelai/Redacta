@@ -27,12 +27,47 @@ export async function loadPdfDocument(file) {
     text += pageText;
     pages.push({ page, pageNumber, width: viewport.width, height: viewport.height, text: pageText, items, start: pageStart });
   }
-  return { kind: "pdf", format: "pdf", name: file.name, type: "application/pdf", size, sizeLabel: formatBytes(size), pageCount: pdf.numPages, bytes, text, pages, pdf };
+  return { kind: "pdf", format: "pdf", name: file.name, type: "application/pdf", size, sizeLabel: formatBytes(size), pageCount: pdf.numPages, bytes, text, pages, pdf, notes: [] };
+}
+
+export function rebuildPdfDocumentText(document) {
+  const notes = document.notes ?? [];
+  let text = "";
+  for (const page of document.pages) {
+    page.start = text.length;
+    let chunk = page.text;
+    for (const note of notes.filter((item) => item.page === page.pageNumber)) {
+      note.offset = page.start + chunk.length;
+      if (note.text) chunk += `${note.text}\n`;
+    }
+    text += chunk;
+  }
+  document.text = text;
+  return document;
 }
 
 export function locatePdfFinding(document, candidate) {
-  const pageInfo = document.pages.find((page) => candidate.offset >= page.start && candidate.offset < page.start + page.text.length)
-    ?? document.pages[document.pages.length - 1];
+  const note = (document.notes ?? []).find((item) => (
+    Number.isInteger(item.offset)
+    && typeof item.text === "string"
+    && item.text.length > 0
+    && candidate.offset >= item.offset
+    && candidate.offset < item.offset + item.text.length
+  ));
+  if (note) {
+    const fontSize = note.fontSize || 14;
+    const lines = note.text.split("\n");
+    const width = Math.max(36, ...lines.map((line) => Math.max(1, line.length) * fontSize * 0.58));
+    return {
+      page: note.page,
+      location: `page ${note.page}, typed note`,
+      boundingBox: { x: note.x, y: note.y, width, height: Math.max(fontSize * 1.35, lines.length * fontSize * 1.35) },
+    };
+  }
+  const pageInfo = document.pages.find((page, index) => {
+    const end = document.pages[index + 1]?.start ?? document.text.length;
+    return candidate.offset >= page.start && candidate.offset < end;
+  }) ?? document.pages[document.pages.length - 1];
   const localStart = Math.max(0, candidate.offset - pageInfo.start);
   const overlaps = pageInfo.items.filter((entry) => entry.start < localStart + candidate.length && entry.end > localStart);
   const itemInfo = overlaps[0] ?? pageInfo.items[0];
@@ -161,6 +196,15 @@ export async function rasterizePdf(pdfDocument, registry, maskMode = "blackout")
     context.fillStyle = "#ffffff";
     context.fillRect(0, 0, canvas.width, canvas.height);
     await pageInfo.page.render({ canvasContext: context, viewport }).promise;
+    for (const note of (pdfDocument.notes ?? []).filter((item) => item.page === pageInfo.pageNumber && item.text)) {
+      const fontSize = (note.fontSize || 14) * 1.5;
+      context.fillStyle = "#181815";
+      context.font = `${fontSize}px Helvetica, Arial, sans-serif`;
+      context.textBaseline = "top";
+      note.text.split("\n").forEach((line, index) => {
+        context.fillText(line, note.x * 1.5, note.y * 1.5 + index * fontSize * 1.25);
+      });
+    }
     const active = registry.active().filter((item) => item.page === pageInfo.pageNumber);
     if (maskMode === "blackout") {
       for (const finding of active) {

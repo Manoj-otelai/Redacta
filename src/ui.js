@@ -1,8 +1,10 @@
 import { createFindingRegistry } from "./registry.js";
-import { loadTextDocument } from "./textDocument.js";
-import { createDemoPdf, loadPdfDocument } from "./pdfDocument.js";
+import { loadTextDocument, writeTextDocument } from "./textDocument.js";
+import { createDemoPdf, loadPdfDocument, rebuildPdfDocumentText } from "./pdfDocument.js";
+import { readEditableDocumentText, remapFindingOffsets } from "./editor.js";
 import { MAX_CUSTOM_PATTERNS, syntheticReplacement } from "./detectors.js";
 import { installNetworkMonitor } from "./network.js";
+import { asBytes, createBrowserSession } from "./session.js";
 import { structuredFields } from "./structured.js";
 import {
   applyRedactions,
@@ -74,6 +76,7 @@ const loadDemoPdf = async () => loadDocument(await loadPdfDocument(await createD
 const toolMap = { inspectDocument, scanDocumentPII, applyRedactions, verifyRedaction, getFindingDetails, exportSanitizedDocument, getVerificationCertificate, registerCustomPattern, listStructuredFields, redactField };
 const state = { document: null, artifact: null, verification: null, structuredFields: [], customPatterns: [], maskMode: "blackout", revision: 0, lastRedactionBatch: [], manualMode: false, pdfPage: 1, zoom: 1 };
 const registry = createFindingRegistry();
+const session = createBrowserSession();
 const audit = { calls: 0, leaks: 0 };
 const AGENT_STEPS = [
   { key: "inspectDocument", label: "Inspect document" },
@@ -108,13 +111,19 @@ let thumbGeneration = 0;
 let thumbKey = null;
 let pdfCanvas = null;
 let previewRefreshBusy = false;
+let noteSequence = 0;
+let thumbEditTimer = 0;
+let persistTimer = 0;
+let persistBusy = false;
+let persistQueued = false;
+let restoring = false;
+let restoreGeneration = 0;
 const context = {
   state,
   registry,
   get document() { return state.document; },
   callSource: "user",
   onProgress(value) {
-    $("processingBadge").textContent = `SCANNING ${value}%`;
     setScanProgress(value);
   },
   onFindingsChanged: render,
@@ -260,6 +269,7 @@ async function executeTool(name, args = {}, source = "user") {
   try {
     const result = await toolMap[name](context, args);
     addActivity(name, args, result);
+    schedulePersist();
     return result;
   } catch {
     const result = { status: "error", message: "The local operation failed." };
@@ -315,6 +325,7 @@ async function refreshPreviewArtifact() {
       }
     }
     render();
+    schedulePersist();
   } catch {
     state.artifact = null;
     toast("Could not refresh the redaction preview.");
@@ -328,6 +339,7 @@ function invalidate() {
   state.artifact = null;
   state.verification = null;
   render();
+  schedulePersist();
   if (registry.all().some((finding) => finding.status === "redacted")) void refreshPreviewArtifact();
 }
 
@@ -350,7 +362,7 @@ function renderTextPreview() {
         ? escapeHtml(syntheticReplacement(finding.type, value, originalValues))
         : "█".repeat(Math.max(4, value.length))
       : escapeHtml(value);
-    parts.push(`<mark class="${finding.status === "redacted" ? (state.maskMode === "synthetic_replacement" ? "redacted synthetic" : "redacted") : ""}" data-finding="${escapeHtml(finding.type)}" data-start="${finding.charStart}" data-end="${finding.charEnd}">${body}</mark>`);
+      parts.push(`<mark contenteditable="false" class="${finding.status === "redacted" ? (state.maskMode === "synthetic_replacement" ? "redacted synthetic" : "redacted") : ""}" data-finding="${escapeHtml(finding.type)}" data-original="${escapeHtml(value)}" data-start="${finding.charStart}" data-end="${finding.charEnd}">${body}</mark>`);
     cursor = finding.charEnd;
   }
   parts.push(`<span data-start="${cursor}" data-end="${text.length}">${escapeHtml(text.slice(cursor))}</span>`);
@@ -418,6 +430,128 @@ function extendManualTextSelection(preview, direction) {
   selection.setBaseAndExtent(anchorPoint[0], anchorPoint[1], focusPoint[0], focusPoint[1]);
 }
 
+function attachTextEditor(content) {
+  if (!content) return;
+  content.addEventListener("input", () => commitLiveTextEdit(content));
+  content.addEventListener("paste", (event) => {
+    event.preventDefault();
+    const text = event.clipboardData?.getData("text/plain") ?? "";
+    document.execCommand("insertText", false, text);
+  });
+}
+
+function commitLiveTextEdit(content) {
+  if (!state.document || state.document.kind === "pdf") return;
+  const next = readEditableDocumentText(content);
+  if (next === state.document.text) return;
+  writeTextDocument(state.document, next);
+  const dropped = remapFindingOffsets(registry.all(), next);
+  if (dropped.length) registry.remove(dropped);
+  state.structuredFields = structuredFields(state.document);
+  state.revision += 1;
+  state.artifact = null;
+  state.verification = null;
+  render({ keepPreview: true });
+  schedulePersist();
+}
+
+function scheduleThumbRefresh() {
+  clearTimeout(thumbEditTimer);
+  thumbEditTimer = setTimeout(() => {
+    thumbKey = null;
+    renderThumbnails();
+  }, 400);
+}
+
+function addPdfNote(pageNumber, x, y, text) {
+  if (!state.document || state.document.kind !== "pdf") return;
+  state.document.notes ??= [];
+  noteSequence += 1;
+  const note = { id: `note_${noteSequence}`, page: pageNumber, x, y, text, fontSize: 14 };
+  state.document.notes.push(note);
+  rebuildPdfDocumentText(state.document);
+  const frame = pdfCanvas?.parentElement;
+  const page = state.document.pages[state.pdfPage - 1];
+  if (frame && page) renderPdfNotesLayer(frame.querySelector(".pdf-notes-layer"), page, pdfCanvas);
+  const field = frame?.querySelector(`[data-note-id="${note.id}"]`);
+  field?.focus();
+  commitPdfNoteEdit();
+}
+
+function commitPdfNoteEdit() {
+  if (!state.document || state.document.kind !== "pdf") return;
+  rebuildPdfDocumentText(state.document);
+  const dropped = remapFindingOffsets(registry.all(), state.document.text);
+  if (dropped.length) registry.remove(dropped);
+  state.revision += 1;
+  state.artifact = null;
+  state.verification = null;
+  render({ keepPreview: true });
+  schedulePersist();
+}
+
+function renderPdfTextLayer(layer, pageInfo, canvas) {
+  if (!layer || !pageInfo) return;
+  layer.replaceChildren();
+  const width = canvas.clientWidth || canvas.width;
+  const height = canvas.clientHeight || canvas.height;
+  if (!width || !height) return;
+  const scaleX = width / pageInfo.width;
+  const scaleY = height / pageInfo.height;
+  for (const entry of pageInfo.items) {
+    const item = entry.item;
+    const fontSize = Math.abs(item.transform?.[3] || item.height || 12);
+    const x = item.transform?.[4] || 0;
+    const baseline = item.transform?.[5] || 0;
+    const span = document.createElement("span");
+    span.textContent = item.str;
+    span.style.left = `${x * scaleX}px`;
+    span.style.top = `${(pageInfo.height - baseline - fontSize) * scaleY}px`;
+    span.style.fontSize = `${Math.max(6, fontSize * scaleY)}px`;
+    if (item.width) span.style.width = `${item.width * scaleX}px`;
+    layer.append(span);
+  }
+}
+
+function renderPdfNotesLayer(layer, pageInfo, canvas) {
+  if (!layer || !pageInfo) return;
+  const width = canvas.clientWidth || canvas.width;
+  const height = canvas.clientHeight || canvas.height;
+  if (!width || !height) return;
+  const scaleX = width / pageInfo.width;
+  const scaleY = height / pageInfo.height;
+  const notes = (state.document.notes ?? []).filter((note) => note.page === pageInfo.pageNumber);
+  const existing = new Map([...layer.querySelectorAll("[data-note-id]")].map((node) => [node.dataset.noteId, node]));
+  for (const [id, node] of existing) {
+    if (!notes.some((note) => note.id === id)) node.remove();
+  }
+  for (const note of notes) {
+    let field = existing.get(note.id);
+    if (!field) {
+      field = document.createElement("textarea");
+      field.className = "pdf-note";
+      field.dataset.noteId = note.id;
+      field.setAttribute("aria-label", "Typed note on this page");
+      field.addEventListener("input", () => {
+        note.text = field.value;
+        field.style.height = "auto";
+        field.style.height = `${Math.max(22, field.scrollHeight)}px`;
+        commitPdfNoteEdit();
+      });
+      field.addEventListener("keydown", (event) => {
+        if (event.key === "Escape") field.blur();
+      });
+      layer.append(field);
+    }
+    if (document.activeElement !== field) field.value = note.text;
+    field.style.left = `${note.x * scaleX}px`;
+    field.style.top = `${note.y * scaleY}px`;
+    field.style.fontSize = `${(note.fontSize || 14) * scaleY}px`;
+    field.style.height = "auto";
+    field.style.height = `${Math.max(22, field.scrollHeight)}px`;
+  }
+}
+
 function attachManualTextSelection(preview) {
   updateManualTextPreviewFocusable(preview);
   preview.onfocus = () => {
@@ -425,6 +559,7 @@ function attachManualTextSelection(preview) {
   };
   preview.onmouseup = () => commitManualTextSelection(preview);
   preview.onkeydown = (event) => {
+    if (!state.manualMode) return;
     if (event.shiftKey && event.key === "ArrowRight") {
       event.preventDefault();
       extendManualTextSelection(preview, 1);
@@ -495,9 +630,13 @@ function createPdfCanvas(preview) {
   const canvas = document.createElement("canvas");
   canvas.className = "pdf-preview";
   canvas.setAttribute("aria-hidden", "true");
+  const textLayer = document.createElement("div");
+  textLayer.className = "pdf-text-layer";
+  const notesLayer = document.createElement("div");
+  notesLayer.className = "pdf-notes-layer";
   const overlay = document.createElement("div");
   overlay.className = "pdf-overlay";
-  frame.append(canvas, overlay);
+  frame.append(canvas, textLayer, notesLayer, overlay);
   preview.replaceChildren(frame);
   let start = null;
   canvas.onpointerdown = (event) => { if (state.manualMode) start = [event.offsetX, event.offsetY]; };
@@ -516,6 +655,16 @@ function createPdfCanvas(preview) {
     setManualMode(false);
     invalidate();
   };
+  textLayer.addEventListener("click", (event) => {
+    if (state.manualMode || event.target !== textLayer || !state.document) return;
+    const page = state.document.pages[state.pdfPage - 1];
+    if (!page) return;
+    const rect = textLayer.getBoundingClientRect();
+    if (!rect.width || !rect.height) return;
+    const x = ((event.clientX - rect.left) / rect.width) * page.width;
+    const y = ((event.clientY - rect.top) / rect.height) * page.height;
+    addPdfNote(page.pageNumber, x, y, "");
+  });
   return canvas;
 }
 
@@ -528,9 +677,10 @@ function renderPreview() {
     renderPdfPreview(pdfCanvas, state.pdfPage).catch(() => toast("Could not render the PDF preview."));
     return;
   }
-  preview.innerHTML = `<div class="text-page"><div class="document-topline"><span>Confidential</span><span>Local document / preview</span></div><h3>${escapeHtml(state.document.name.replace(/\.[^.]+$/, ""))}</h3><p class="text-content">${renderTextPreview()}</p><div class="document-footer"><span>Redacta · private</span><span>Page 1 of 1</span></div></div>`;
+  preview.innerHTML = `<div class="text-page"><div class="document-topline"><span>Confidential</span><span>Local document / edit</span></div><h3>${escapeHtml(state.document.name.replace(/\.[^.]+$/, ""))}</h3><p class="text-content" id="documentEditor" contenteditable="true" role="textbox" aria-multiline="true" spellcheck="true">${renderTextPreview()}</p><div class="document-footer"><span>Redacta · private</span><span>Page 1 of 1</span></div></div>`;
   pdfCanvas = null;
   attachManualTextSelection(preview.firstElementChild);
+  attachTextEditor($("documentEditor"));
 }
 
 function renderViewerChrome() {
@@ -567,7 +717,10 @@ function renderThumbnails() {
   }
   const pageCount = state.document.kind === "pdf" ? state.document.pageCount : 1;
   $("thumbCount").textContent = String(pageCount);
-  const key = `${state.document.name}:${state.artifact?.digest ?? "source"}:${pageCount}`;
+  const redacted = registry.all().filter((finding) => finding.status === "redacted").length;
+  const key = state.document.kind === "pdf"
+    ? `${state.document.name}:${state.artifact?.digest ?? "source"}:${pageCount}`
+    : `${state.document.name}:${pageCount}:${registry.all().length}:${redacted}:${state.maskMode}`;
   if (thumbKey !== key) {
     thumbKey = key;
     const generation = ++thumbGeneration;
@@ -585,9 +738,9 @@ function renderThumbnails() {
         thumb.append(canvas, label);
         renderThumbnail(canvas, pageNumber, generation).catch(() => {});
       } else {
-        const face = document.createElement("span");
-        face.className = "thumb-face";
-        face.textContent = "¶";
+        const face = document.createElement("div");
+        face.className = "thumb-face is-text";
+        face.innerHTML = `<div class="thumb-mini text-page"><div class="document-topline"><span>Confidential</span><span>Local document / preview</span></div><h3>${escapeHtml(state.document.name.replace(/\.[^.]+$/, ""))}</h3><p class="text-content">${renderTextPreview()}</p></div>`;
         thumb.append(face, label);
       }
       list.append(thumb);
@@ -633,6 +786,11 @@ async function renderPdfPreview(canvas, pageNumber) {
   canvas.width = buffer.width;
   canvas.height = buffer.height;
   canvas.getContext("2d").drawImage(buffer, 0, 0);
+  const frame = canvas.parentElement;
+  if (frame) {
+    renderPdfTextLayer(frame.querySelector(".pdf-text-layer"), page, canvas);
+    renderPdfNotesLayer(frame.querySelector(".pdf-notes-layer"), page, canvas);
+  }
 }
 
 function captureTaskFocus() {
@@ -670,18 +828,11 @@ function restoreTaskFocus(snapshot) {
   target.focus();
 }
 
-function render() {
+function render(options = {}) {
   const focus = captureTaskFocus();
   const findings = registry.all();
   const verified = Boolean(state.verification?.passed);
-  $("processingBadge").textContent = verified ? "VERIFIED" : state.document ? "READY" : "NO DOCUMENT";
-  $("processingBadge").classList.toggle("verified", verified);
   $("findingTotal").textContent = `${findings.length} found`;
-  $("networkUploads").textContent = String(state.networkUploads || 0);
-  $("bottomUploadCount").textContent = String(state.networkUploads || 0);
-  $("statusFindings").textContent = String(findings.length);
-  $("statusExport").textContent = verified ? "unlocked" : "blocked";
-  $("verifiedStat").textContent = verified ? "VERIFIED" : "—";
   $("verificationMessage").textContent = state.verification && !verified
     ? state.verification.originalValuesFound > 0
       ? `⚠ Verification failed — ${plural(state.verification.originalValuesFound, "original value")} found in the generated artifact. Export blocked.`
@@ -711,7 +862,6 @@ function render() {
   renderStructuredFields();
   renderCustomPatterns();
   renderVerificationSummary();
-  renderCertificateCard();
   const pending = findings.filter((finding) => finding.status === "pending");
   const selectable = findings.filter((finding) => finding.status !== "redacted");
   $("listToolbar").hidden = !findings.length;
@@ -724,8 +874,11 @@ function render() {
   $("exportButton").disabled = !verified;
   $("undoButton").disabled = !state.lastRedactionBatch.length;
   renderViewerChrome();
-  renderThumbnails();
-  renderPreview();
+  if (options.keepPreview) scheduleThumbRefresh();
+  else {
+    renderThumbnails();
+    renderPreview();
+  }
   restoreTaskFocus(focus);
 }
 
@@ -747,13 +900,7 @@ function renderCustomPatterns() {
   $("customPatternCount").textContent = `${patterns.length} / ${MAX_CUSTOM_PATTERNS}`;
   const list = $("customPatternList");
   list.replaceChildren();
-  if (!patterns.length) {
-    const empty = document.createElement("div");
-    empty.className = "custom-pattern-empty";
-    empty.textContent = "No custom patterns registered.";
-    list.append(empty);
-    return;
-  }
+  if (!patterns.length) return;
   for (const pattern of patterns) {
     const row = document.createElement("div");
     row.className = "custom-pattern-row";
@@ -818,7 +965,6 @@ function renderVerificationSummary() {
   const passed = Boolean(state.verification?.passed);
   summary.hidden = !passed;
   if (!passed) return;
-  const categories = Object.keys(state.verification.categories ?? {}).length;
   const certificate = state.verification.certificate;
   const certified = document.createElement("p");
   certified.className = "certificate-summary";
@@ -827,45 +973,8 @@ function renderVerificationSummary() {
     : "Verified artifact certificate unavailable.";
   summary.replaceChildren(
     Object.assign(document.createElement("strong"), { textContent: "Verification passed" }),
-    Object.assign(document.createElement("p"), { textContent: `Rescanned the generated artifact across ${categories} categories — nothing sensitive is extractable as text, and every detected finding is masked.` }),
     certified,
   );
-}
-
-function renderCertificateCard() {
-  const card = $("certificateCard");
-  if (!card) return;
-  const certificate = state.verification?.passed ? state.verification.certificate : null;
-  card.hidden = !certificate;
-  if (!certificate) return;
-  $("certificateId").textContent = certificate.certificateId;
-  $("certificateDigest").textContent = certificate.artifactDigest;
-  $("certificateIssuedAt").textContent = new Date(certificate.issuedAt).toLocaleString();
-  $("certificateMaskMode").textContent = certificate.maskMode;
-  $("certificateArtifactCheck").textContent = `Artifact rescan · ${certificate.extractableFindings} extractable`;
-  $("certificateCoverageCheck").textContent = `Mask coverage · ${certificate.unmaskedRegions} unmasked`;
-  $("certificateOriginalsCheck").textContent = `Original values · ${certificate.originalValuesFound} found`;
-}
-
-async function copyCertificateDigest() {
-  const digest = state.verification?.certificate?.artifactDigest;
-  if (!digest) return;
-  try {
-    await navigator.clipboard.writeText(digest);
-    toast("Certificate digest copied.");
-  } catch {
-    toast("Copying is blocked here · select the digest instead.");
-  }
-}
-
-function downloadCertificate() {
-  const certificate = state.verification?.certificate;
-  if (!certificate) return;
-  context.downloadArtifact(
-    new Blob([JSON.stringify(certificate, null, 2)], { type: "application/json" }),
-    `redacta-certificate-${certificate.certificateId}.json`,
-  );
-  toast("Certificate downloaded locally.");
 }
 
 function setManualMode(enabled) {
@@ -881,6 +990,7 @@ function goToPage(pageNumber) {
   renderViewerChrome();
   renderThumbnails();
   renderPreview();
+  schedulePersist();
 }
 
 function fitToWidth() {
@@ -893,6 +1003,7 @@ function fitToWidth() {
   state.zoom = Math.round(Math.max(ZOOM_STEPS[0], Math.min(ZOOM_STEPS.at(-1), zoom)) * 100) / 100;
   renderViewerChrome();
   renderPreview();
+  schedulePersist();
 }
 
 function stepZoom(direction) {
@@ -902,6 +1013,7 @@ function stepZoom(direction) {
   state.zoom = next;
   renderViewerChrome();
   renderPreview();
+  schedulePersist();
 }
 
 function activatePane(name) {
@@ -1044,12 +1156,37 @@ async function runAgentDemo() {
   }
 }
 
-async function loadDocument(document) {
+function noteSequenceFrom(notes) {
+  return (notes ?? []).reduce((max, note) => {
+    const value = Number(String(note.id ?? "").replace(/^note_/, ""));
+    return Number.isFinite(value) ? Math.max(max, value) : max;
+  }, 0);
+}
+
+function adoptDocument(document, { resetWorkspace = true } = {}) {
   state.document = document;
   state.structuredFields = structuredFields(document);
+  document.notes ??= [];
+  noteSequence = noteSequenceFrom(document.notes);
+  $("fileName").textContent = document.name;
+  pdfPreviewCache = { key: null, pdf: null };
+  pdfCanvas = null;
+  thumbKey = null;
+  if (!resetWorkspace) return;
   state.revision += 1;
   state.artifact = null;
   state.verification = null;
+  state.lastRedactionBatch = [];
+  state.pdfPage = 1;
+  state.zoom = 1;
+  registry.replace([]);
+}
+
+function clearWorkspaceView() {
+  state.document = null;
+  state.artifact = null;
+  state.verification = null;
+  state.structuredFields = [];
   state.lastRedactionBatch = [];
   state.pdfPage = 1;
   state.zoom = 1;
@@ -1057,10 +1194,164 @@ async function loadDocument(document) {
   pdfCanvas = null;
   thumbKey = null;
   registry.replace([]);
-  $("fileName").textContent = document.name;
-  $("fileMeta").textContent = `${document.format.toUpperCase()} · ${document.sizeLabel} · ${document.pageCount} page${document.pageCount === 1 ? "" : "s"} · local`;
+  $("fileName").textContent = "No document open";
+}
+
+async function snapshotArtifact(artifact) {
+  if (!artifact?.blob) return null;
+  return {
+    kind: artifact.kind,
+    maskMode: artifact.maskMode,
+    revision: artifact.revision,
+    digest: artifact.digest,
+    type: artifact.blob.type,
+    bytes: asBytes(await artifact.blob.arrayBuffer()),
+  };
+}
+
+async function buildWorkspaceSnapshot() {
+  const document = state.document;
+  if (!document?.bytes) return null;
+  return {
+    document: {
+      kind: document.kind,
+      format: document.format,
+      name: document.name,
+      type: document.type,
+      size: document.size,
+      sizeLabel: document.sizeLabel,
+      pageCount: document.pageCount,
+      bytes: asBytes(document.bytes).slice(),
+      notes: (document.notes ?? []).map((note) => ({
+        id: note.id,
+        page: note.page,
+        x: note.x,
+        y: note.y,
+        text: note.text,
+        fontSize: note.fontSize,
+      })),
+    },
+    findings: registry.all().map((finding) => ({
+      ...finding,
+      boundingBox: finding.boundingBox ? { ...finding.boundingBox } : finding.boundingBox,
+    })),
+    customPatterns: state.customPatterns.map((pattern) => ({ ...pattern })),
+    maskMode: state.maskMode,
+    revision: state.revision,
+    lastRedactionBatch: [...state.lastRedactionBatch],
+    pdfPage: state.pdfPage,
+    zoom: state.zoom,
+    artifact: await snapshotArtifact(state.artifact),
+    verification: state.verification ? JSON.parse(JSON.stringify(state.verification)) : null,
+  };
+}
+
+async function materializeDocument(saved) {
+  const bytes = asBytes(saved.bytes);
+  const file = new File([bytes], saved.name, { type: saved.type || (saved.kind === "pdf" ? "application/pdf" : "text/plain") });
+  if (saved.kind === "pdf") {
+    const document = await loadPdfDocument(file);
+    document.notes = Array.isArray(saved.notes) ? saved.notes.map((note) => ({ ...note })) : [];
+    rebuildPdfDocumentText(document);
+    return document;
+  }
+  return loadTextDocument(file);
+}
+
+function restoreArtifact(saved) {
+  if (!saved?.bytes) return null;
+  return {
+    kind: saved.kind,
+    maskMode: saved.maskMode,
+    revision: saved.revision,
+    digest: saved.digest,
+    blob: new Blob([asBytes(saved.bytes)], { type: saved.type || "" }),
+  };
+}
+
+function schedulePersist() {
+  if (restoring) return;
+  clearTimeout(persistTimer);
+  persistTimer = setTimeout(() => { void persistWorkspace(); }, 280);
+}
+
+function flushPersist() {
+  if (restoring) return;
+  clearTimeout(persistTimer);
+  void persistWorkspace();
+}
+
+async function persistWorkspace() {
+  if (restoring) return;
+  if (persistBusy) {
+    persistQueued = true;
+    return;
+  }
+  persistBusy = true;
+  try {
+    if (!state.document) {
+      await session.discard();
+      return;
+    }
+    const workspace = await buildWorkspaceSnapshot();
+    if (workspace) await session.save(workspace);
+  } catch {
+    // Session restore is best-effort; keep the live workspace usable.
+  } finally {
+    persistBusy = false;
+    if (persistQueued) {
+      persistQueued = false;
+      void persistWorkspace();
+    }
+  }
+}
+
+async function restoreWorkspace() {
+  const generation = ++restoreGeneration;
+  restoring = true;
+  try {
+    const snapshot = await session.restore();
+    if (generation !== restoreGeneration || !snapshot?.document) return false;
+    const document = await materializeDocument(snapshot.document);
+    if (generation !== restoreGeneration) return false;
+    adoptDocument(document, { resetWorkspace: false });
+    registry.hydrate(snapshot.findings ?? []);
+    state.customPatterns = Array.isArray(snapshot.customPatterns) ? snapshot.customPatterns : [];
+    state.maskMode = snapshot.maskMode === "synthetic_replacement" ? "synthetic_replacement" : "blackout";
+    state.revision = Number.isInteger(snapshot.revision) ? snapshot.revision : 0;
+    state.lastRedactionBatch = Array.isArray(snapshot.lastRedactionBatch) ? snapshot.lastRedactionBatch : [];
+    state.pdfPage = Number.isInteger(snapshot.pdfPage) && snapshot.pdfPage > 0 ? snapshot.pdfPage : 1;
+    state.zoom = typeof snapshot.zoom === "number" && snapshot.zoom > 0 ? snapshot.zoom : 1;
+    state.artifact = restoreArtifact(snapshot.artifact);
+    state.verification = snapshot.verification ?? null;
+    render();
+    toast("Restored this tab’s workspace");
+    return true;
+  } catch {
+    if (generation !== restoreGeneration) return false;
+    clearWorkspaceView();
+    try { await session.discard(); } catch { /* ignore */ }
+    toast("Could not restore this tab’s workspace.");
+    render();
+    return false;
+  } finally {
+    if (generation === restoreGeneration) restoring = false;
+  }
+}
+
+async function bootSession() {
+  const restored = await restoreWorkspace();
+  if (!restored) render();
+  if (new URLSearchParams(location.search).get("demo") === "agent") await runAgentDemo();
+}
+
+async function loadDocument(document) {
+  restoreGeneration += 1;
+  restoring = false;
+  adoptDocument(document, { resetWorkspace: true });
   render();
   toast("Document loaded locally · no upload made");
+  await persistWorkspace();
 }
 
 async function handleFile(file) {
@@ -1090,10 +1381,13 @@ async function runScan() {
 async function runRedaction() {
   const targetIds = registry.all().filter((finding) => finding.status === "pending").map((finding) => finding.id);
   if (!targetIds.length) return toast("Select at least one finding to redact.");
+  state.lastRedactionBatch = targetIds;
   const result = await executeTool("applyRedactions", { targetIds, maskMode: state.maskMode }, "user");
-  if (result.status !== "success") toast(result.status === "denied" ? "Redaction cancelled." : "Redaction failed. No export was performed.");
-  else {
-    state.lastRedactionBatch = targetIds;
+  if (result.status !== "success") {
+    state.lastRedactionBatch = [];
+    schedulePersist();
+    toast(result.status === "denied" ? "Redaction cancelled." : "Redaction failed. No export was performed.");
+  } else {
     render();
     toast(`${result.totalRedacted} findings masked locally`);
   }
@@ -1136,6 +1430,7 @@ async function redactStructuredField(field) {
     return;
   }
   state.lastRedactionBatch = result.redactedIds;
+  schedulePersist();
   render();
   toast("Field redacted locally.");
 }
@@ -1148,38 +1443,44 @@ function registerTools() {
       ? navigator.modelContext
       : null;
   if (!modelContext) {
-    $("nativeStatusText").textContent = "Demo Mode";
-    $("nativeStatus").classList.add("is-demo");
-    $("nativeStatus").title = "Native WebMCP isn't available. Demo Mode is active — the same tools are callable from the tool console.";
     $("modeLabel").textContent = "DEMO MODE";
-    $("statusMode").textContent = "demo mode";
     Object.assign(window, Object.fromEntries(Object.keys(toolMap).map((name) => [name, (input) => execute(name, input)])));
     return;
   }
   for (const [name] of Object.entries(toolMap)) modelContext.registerTool({ name, description: TOOL_DESCRIPTIONS[name], inputSchema: TOOL_SCHEMAS[name], execute: (input) => execute(name, input) });
   $("modeLabel").textContent = "NATIVE WEBMCP";
-  $("nativeStatusText").textContent = `${Object.keys(toolMap).length} WebMCP tools registered`;
-  $("statusMode").textContent = "native";
 }
 
 export function initUI() {
   state.networkUploads = 0;
-  installNetworkMonitor((count) => { state.networkUploads = count; render(); });
-  const openFile = () => $("fileInput").click();
-  $("browseButton").addEventListener("click", openFile);
-  $("menuOpen").addEventListener("click", openFile);
-  $("fileInput").addEventListener("change", (event) => handleFile(event.target.files[0]));
+  installNetworkMonitor((count) => { state.networkUploads = count; });
+  const fileInput = $("fileInput");
+  const dropHasFiles = (event) => Boolean(event.dataTransfer?.types && [...event.dataTransfer.types].includes("Files"));
+  const allowFileDrop = (event) => {
+    if (!dropHasFiles(event)) return;
+    event.preventDefault();
+    if (event.dataTransfer) event.dataTransfer.dropEffect = "copy";
+    $("dropZone").classList.add("dragging");
+  };
+  fileInput.addEventListener("change", (event) => {
+    handleFile(event.target.files[0]);
+    event.target.value = "";
+  });
   const stage = document.querySelector(".viewer-stage");
-  stage.addEventListener("dragover", (event) => { event.preventDefault(); $("dropZone").classList.add("dragging"); });
-  stage.addEventListener("dragleave", () => $("dropZone").classList.remove("dragging"));
-  stage.addEventListener("drop", (event) => { event.preventDefault(); $("dropZone").classList.remove("dragging"); handleFile(event.dataTransfer.files[0]); });
+  stage.addEventListener("dragenter", allowFileDrop, true);
+  stage.addEventListener("dragover", allowFileDrop, true);
+  stage.addEventListener("dragleave", (event) => {
+    if (event.relatedTarget && stage.contains(event.relatedTarget)) return;
+    $("dropZone").classList.remove("dragging");
+  });
+  stage.addEventListener("drop", (event) => {
+    if (!dropHasFiles(event)) return;
+    event.preventDefault();
+    event.stopPropagation();
+    $("dropZone").classList.remove("dragging");
+    handleFile(event.dataTransfer.files[0]);
+  }, true);
   $("scanButton").addEventListener("click", runScan);
-  $("loadDemoButton").addEventListener("click", loadDemoText);
-  $("menuDemoJson").addEventListener("click", loadDemoJson);
-  $("menuDemoCsv").addEventListener("click", loadDemoCsv);
-  $("loadDemoPdfButton").addEventListener("click", loadDemoPdf);
-  $("menuDemoText").addEventListener("click", loadDemoText);
-  $("menuDemoPdf").addEventListener("click", loadDemoPdf);
   $("pagePrev").addEventListener("click", () => goToPage(state.pdfPage - 1));
   $("pageNext").addEventListener("click", () => goToPage(state.pdfPage + 1));
   $("pageInput").addEventListener("change", (event) => goToPage(Number(event.target.value)));
@@ -1196,8 +1497,6 @@ export function initUI() {
   for (const button of document.querySelectorAll(".rail-button")) button.addEventListener("click", () => activatePane(button.dataset.pane));
   $("redactButton").addEventListener("click", runRedaction);
   $("verifyButton").addEventListener("click", runVerification);
-  $("copyCertificateDigest").addEventListener("click", copyCertificateDigest);
-  $("downloadCertificate").addEventListener("click", downloadCertificate);
   $("exportButton").addEventListener("click", async () => {
     const result = await executeTool("exportSanitizedDocument", { filename: `redacta-sanitized.${state.document.format}` }, "user");
     if (result.status === "success") toast("Verified copy downloaded locally");
@@ -1269,13 +1568,23 @@ export function initUI() {
     const button = event.target.closest("[data-field-name]");
     if (button) void redactStructuredField(button.dataset.fieldName);
   });
+  document.addEventListener("paste", (event) => {
+    if (state.manualMode || !state.document || state.document.kind !== "pdf") return;
+    if (event.target.closest("input, textarea, select, [contenteditable='true'], .pdf-note")) return;
+    if (!document.querySelector(".viewer-stage:hover") && !event.target.closest(".pdf-frame")) return;
+    const text = event.clipboardData?.getData("text/plain");
+    if (!text) return;
+    event.preventDefault();
+    const page = state.document.pages[state.pdfPage - 1];
+    if (page) addPdfNote(page.pageNumber, 54, 72, text);
+  });
   document.addEventListener("keydown", (event) => {
     if (event.key === "Escape") {
       if (!$("permissionModal").hidden) return $("permissionCancel").click();
       if (state.manualMode) setManualMode(false);
       return;
     }
-    if (event.target.matches("input, textarea, select") || event.ctrlKey || event.metaKey || event.altKey || event.shiftKey) return;
+    if (event.target.closest("input, textarea, select, [contenteditable='true'], .pdf-note, .pdf-text-layer") || event.ctrlKey || event.metaKey || event.altKey || event.shiftKey) return;
     if (event.key === "ArrowLeft" || event.key === "PageUp") goToPage(state.pdfPage - 1);
     else if (event.key === "ArrowRight" || event.key === "PageDown") goToPage(state.pdfPage + 1);
     else if (event.key === "+" || event.key === "=") stepZoom(1);
@@ -1291,10 +1600,19 @@ export function initUI() {
       $("developerResult").textContent = JSON.stringify({ status: "error", message: "Arguments must be valid JSON." }, null, 2);
     }
   });
+  window.addEventListener("beforeunload", (event) => {
+    if (!state.document) return;
+    flushPersist();
+    event.preventDefault();
+    event.returnValue = "";
+  });
+  window.addEventListener("pagehide", flushPersist);
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "hidden") flushPersist();
+  });
   registerTools();
   renderAudit();
   renderAgentSteps();
   updateAgentDemoButtons();
-  render();
-  if (new URLSearchParams(location.search).get("demo") === "agent") runAgentDemo();
+  void bootSession();
 }

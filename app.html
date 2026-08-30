@@ -13,25 +13,16 @@
     <div class="app">
       <h1 class="visually-hidden">Redacta workspace</h1>
       <header class="app-bar">
-        <a class="brand" href="./"><svg class="brand-icon" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="4" fill="#f4f2ee" /><rect x="6" y="8" width="20" height="4" rx="1" fill="#101010" /><rect x="6" y="14" width="14" height="4" rx="1" fill="#6a67ff" /><rect x="6" y="20" width="9" height="4" rx="1" fill="#101010" /></svg><span class="brand-name">redacta</span></a>
-        <nav class="menu-bar" aria-label="Application menus">
-          <button class="menu-item" id="menuOpen" type="button">File</button>
-          <button class="menu-item" id="menuDemoText" type="button">Demo TXT</button>
-          <button class="menu-item" id="menuDemoJson" type="button">Demo JSON</button>
-          <button class="menu-item" id="menuDemoCsv" type="button">Demo CSV</button>
-          <button class="menu-item" id="menuDemoPdf" type="button">Demo PDF</button>
-        </nav>
-        <div class="doc-chip">
+        <a class="brand" href="./"><span class="brand-name">redacta</span></a>
+        <label class="doc-chip" for="fileInput" title="Open a document">
           <svg class="doc-chip-icon" viewBox="0 0 20 20" aria-hidden="true"><path d="M5 2h6l4 4v12H5z" /><path d="M11 2v4h4" /></svg>
-          <span class="doc-chip-text"><strong id="fileName">No document open</strong><small id="fileMeta">Drop a PDF, TXT, JSON or CSV file to begin</small></span>
-        </div>
+          <span class="doc-chip-text"><strong id="fileName">No document open</strong></span>
+        </label>
         <div class="app-bar-right">
           <button class="bar-action" id="runAgentDemo" type="button" title="Run the full agent workflow through WebMCP">
             <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 2.5l1.6 3.9 3.9 1.6-3.9 1.6L10 13.5 8.4 9.6 4.5 8l3.9-1.6zM15.5 13l.8 1.7 1.7.8-1.7.8-.8 1.7-.8-1.7-1.7-.8 1.7-.8z" /></svg>
             <span id="runAgentDemoText">Run agent demo</span>
           </button>
-          <span class="native-status" id="nativeStatus"><span class="status-dot"></span> <span id="nativeStatusText">WebMCP ready</span></span>
-          <span class="local-pill"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M6 9V7a4 4 0 0 1 8 0v2" /><rect x="4.5" y="9" width="11" height="8" rx="1.5" /></svg> Local only</span>
         </div>
       </header>
 
@@ -44,10 +35,6 @@
           <button class="rail-button" type="button" data-pane="agent" aria-pressed="false" title="Agent activity">
             <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="7" width="16" height="12" rx="2" /><path d="M9 12h.01M15 12h.01M10 16h4M12 4v3" /></svg>
             <span>Agent</span>
-          </button>
-          <button class="rail-button" type="button" data-pane="privacy" aria-pressed="false" title="Privacy boundary">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l7 3v6c0 4-3 7-7 9-4-2-7-5-7-9V6z" /><path d="M9 12l2 2 4-4" /></svg>
-            <span>Privacy</span>
           </button>
           <div class="rail-spacer"></div>
           <button class="rail-button" type="button" data-pane="developer" aria-pressed="false" title="Developer panel">
@@ -81,7 +68,6 @@
               <button class="icon-button toggle" id="manualButton" type="button" aria-pressed="false" title="Manual redaction — drag on the page or select text"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 16l3-1 8-8-2-2-8 8z" /><path d="M13 4l3 3" /></svg><span class="icon-button-text">Mark manually</span></button>
             </div>
             <div class="toolbar-spacer"></div>
-            <span class="ready-badge" id="processingBadge">READY</span>
           </div>
 
           <div class="viewer-stage">
@@ -89,16 +75,12 @@
             <div class="viewer-empty" id="dropZone">
               <svg class="viewer-empty-icon" viewBox="0 0 48 48" aria-hidden="true"><path d="M12 6h16l8 8v28H12z" /><path d="M28 6v8h8" /><path d="M24 34V22m0 0l-4 4m4-4l4 4" /></svg>
               <h2>Open a document</h2>
-              <p>Drag a file here, or open one from your machine. Nothing leaves your browser.</p>
               <div class="viewer-empty-actions">
-                <button class="button button-primary" id="browseButton" type="button">Open file</button>
-                <button class="button button-secondary" id="loadDemoPdfButton" type="button">Load demo PDF</button>
-                <button class="button button-quiet" id="loadDemoButton" type="button">Load demo TXT</button>
+                <label class="button button-primary" id="browseButton" for="fileInput">Open file</label>
               </div>
               <p class="viewer-empty-hint">or <button class="link-button" id="emptyAgentDemo" type="button">watch the agent run the whole workflow</button></p>
-              <p class="viewer-empty-formats">PDF · TXT · JSON · CSV</p>
-              <input type="file" id="fileInput" accept=".pdf,.txt,.json,.csv,application/pdf,text/plain,application/json,text/csv" hidden />
             </div>
+            <input type="file" id="fileInput" class="visually-hidden" accept=".pdf,.txt,.json,.csv,application/pdf,text/plain,application/json,text/csv" />
           </div>
         </main>
 
@@ -109,7 +91,6 @@
               <span class="task-count" id="findingTotal">0 found</span>
             </header>
             <div class="task-scroll">
-              <p class="task-hint">Findings are detected locally. The agent receives IDs, categories, confidence, status and page numbers — never values or locations.</p>
               <div class="scan-progress" id="scanProgress" hidden>
                 <div class="scan-progress-head">Scanning locally <strong id="scanPercent">0%</strong></div>
                 <div class="scan-track" id="scanTrack" role="progressbar" aria-label="Local scan progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span id="scanBar"></span></div>
@@ -142,10 +123,7 @@
                   <span id="customPatternsTitle">Custom patterns</span>
                   <span class="custom-pattern-count mono" id="customPatternCount">0 / 5</span>
                 </div>
-                <p class="custom-pattern-hint">Agents can register extra patterns only with human approval. Patterns run locally.</p>
-                <div class="custom-pattern-list" id="customPatternList">
-                  <div class="custom-pattern-empty">No custom patterns registered.</div>
-                </div>
+                <div class="custom-pattern-list" id="customPatternList"></div>
                 <form class="custom-pattern-form" id="customPatternForm">
                   <label class="field-label" for="customPatternName">Name</label>
                   <input id="customPatternName" name="name" type="text" autocomplete="off" />
@@ -198,40 +176,6 @@
             </div>
           </section>
 
-          <section class="task-panel" id="panel-privacy">
-            <header class="task-head"><h2>Privacy boundary</h2><span class="task-count ok" id="verifiedStat">—</span></header>
-            <div class="task-scroll">
-              <div class="privacy-grid">
-                <div class="privacy-row"><span>Original file</span><strong>LOCAL</strong></div>
-                <div class="privacy-row"><span>Outbound requests</span><strong id="networkUploads">0</strong></div>
-                <div class="privacy-row"><span>Processing</span><strong>100% IN BROWSER</strong></div>
-              </div>
-              <article class="certificate-card" id="certificateCard" hidden>
-                <div class="certificate-head"><span class="certificate-seal">✓</span><div><strong>Certificate of cleanliness</strong><small>Metadata-only proof</small></div></div>
-                <p class="certificate-id mono" id="certificateId"></p>
-                <dl class="certificate-meta">
-                  <div><dt>Digest</dt><dd id="certificateDigest"></dd></div>
-                  <div><dt>Issued</dt><dd id="certificateIssuedAt"></dd></div>
-                  <div><dt>Mask mode</dt><dd id="certificateMaskMode"></dd></div>
-                </dl>
-                <ul class="certificate-checks">
-                  <li id="certificateArtifactCheck"></li>
-                  <li id="certificateCoverageCheck"></li>
-                  <li id="certificateOriginalsCheck"></li>
-                </ul>
-                <div class="button-row">
-                  <button class="button button-secondary" id="copyCertificateDigest" type="button">Copy digest</button>
-                  <button class="button button-secondary" id="downloadCertificate" type="button">Download</button>
-                </div>
-              </article>
-              <p class="tiny-label">Agent can see</p>
-              <ul class="safe-list"><li>Finding IDs and counts</li><li>Categories and page numbers</li><li>Confidence scores</li><li>Verification status</li></ul>
-              <p class="tiny-label">Agent cannot see</p>
-              <ul class="locked-list"><li>Document contents</li><li>PII values &amp; secrets</li><li>Artifact bytes</li></ul>
-              <blockquote class="pitch">“The agent knows the counts.<br /><em>It never knows the values.</em>”</blockquote>
-            </div>
-          </section>
-
           <section class="task-panel" id="panel-developer">
             <header class="task-head"><h2>Tool console</h2><span class="task-count mono">WEBMCP</span></header>
             <div class="task-scroll">
@@ -246,16 +190,6 @@
           </section>
         </aside>
       </div>
-
-      <footer class="status-bar">
-        <span class="status-cell"><span class="status-dot ok"></span> Document stays local</span>
-        <span class="status-cell">Outbound requests <strong id="bottomUploadCount">0</strong></span>
-        <span class="status-cell">Findings <strong id="statusFindings">0</strong></span>
-        <span class="status-cell" role="status">Export <strong id="statusExport">blocked</strong></span>
-        <span class="status-cell">WebMCP <strong id="statusMode">—</strong></span>
-        <span class="status-spacer"></span>
-        <span class="status-cell muted">The WebMCP-native privacy boundary for AI agents</span>
-      </footer>
     </div>
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>

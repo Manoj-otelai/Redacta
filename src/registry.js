@@ -19,7 +19,20 @@ export function createFindingRegistry() {
         });
       }
     },
+    hydrate(entries) {
+      records.clear();
+      sequence = 0;
+      for (const entry of entries ?? []) {
+        if (!entry?.id) continue;
+        records.set(entry.id, { ...entry });
+        const match = /^finding_(\d+)$/.exec(entry.id);
+        if (match) sequence = Math.max(sequence, Number(match[1]));
+      }
+    },
     all() { return [...records.values()]; },
+    remove(ids) {
+      for (const id of ids) records.delete(id);
+    },
     get(id) { return records.get(id); },
     markRedacted(ids) {
       const selected = ids ? new Set(ids) : null;

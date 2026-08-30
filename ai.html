@@ -50,12 +50,7 @@ rendering of <a href="./index.html">redacta/index.html</a> — same content, no 
   <section class="blk">
     <div class="blk-body"><pre><span class="m-heading m-h1"><span class="m-hash">#</span> Agents work on documents they cannot read</span>
 
-Finds, masks, and proves data is gone — in your browser, never the agent.
-
-  0  bytes of your document uploaded
- 10  WebMCP tools registered
-  8  detector categories, locally run
-  3  independent checks before export</pre></div>
+Finds, masks, and proves data is gone — in your browser, never the agent.</pre></div>
     <button class="copy" type="button" title="Copy this block">copy</button>
   </section>
 
@@ -67,19 +62,19 @@ these categories, redact these findings, verify, export. The browser does all
 of it locally and answers with metadata only, so the values that made the
 document confidential never cross the boundary.
 
-What the agent receives:
-  type: "credit_card"      category
-  page: 3                  page
-  confidence: 0.98         score
-  status: "redacted"       state
-  passed: true             verification
+What the agent receives (metadata only):
+  Category       credit_card
+  Page           3
+  Confidence     0.98
+  Status         redacted
+  Verification   passed
 
 What it never receives:
-  ████████████  the SSN
-  ████████████  the card number
-  ████████████  the API key
-  ████████████  document text
-  ████████████  artifact bytes</pre></div>
+  Social Security   123-45-6789
+  Card number       4111 1111 1111 1111
+  API key           sk_live_51NORTHSTAR
+  Document text     Employment Agreement…
+  Artifact bytes    1.04 MB PDF</pre></div>
     <button class="copy" type="button" title="Copy this block">copy</button>
   </section>
 

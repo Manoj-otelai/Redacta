@@ -1,5 +1,14 @@
 import { syntheticReplacement } from "./detectors.js";
 
+export function writeTextDocument(document, text) {
+  const bytes = new TextEncoder().encode(text);
+  document.text = text;
+  document.bytes = bytes;
+  document.size = bytes.byteLength;
+  document.sizeLabel = formatBytes(bytes.byteLength);
+  return document;
+}
+
 export async function loadTextDocument(file) {
   const text = typeof file === "string" ? file : await file.text();
   const name = file?.name ?? "document.txt";

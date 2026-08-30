@@ -33,7 +33,7 @@ The product in one line: the agent can know there are seven SSNs. It never knows
 Open the hosted workspace in **ChatGPT’s in-app browser** (WebMCP on by default) or **Chrome 149+** with `chrome://flags/#enable-webmcp-testing` enabled, then restart Chrome.
 
 1. Open `app.html`, or `app.html?demo=agent` to start the full run on load.
-2. If no file is loaded, use **Demo PDF** (or TXT / JSON / CSV) from the menu. Nothing is uploaded.
+2. Open a local PDF, TXT, JSON, or CSV — or click **Run agent demo**, which loads the synthetic contract. Nothing is uploaded.
 3. With native WebMCP, the status chip reads **NATIVE WEBMCP** and ten tools are registered on `document.modelContext` or `navigator.modelContext`.
 4. Without the flag, **Demo Mode** exposes the same tools on `window` and in the **Console** pane — same schemas, same privacy projection.
 5. Click **Run agent demo**, or paste the prompt from the Agent pane into ChatGPT. Mutating calls (`applyRedactions`, `exportSanitizedDocument`, `registerCustomPattern`, `redactField`) stop for an in-page confirmation.
@@ -139,7 +139,7 @@ Open the printed URL.
 
 Fonts and landing artwork ship in `assets/`, so the pages make no external requests. Netlify (`netlify.toml`) and Vercel (`vercel.json`) publish the repository root as static files.
 
-The File menu loads local files or synthetic demos: **Demo TXT**, **Demo PDF**, **Demo JSON**, **Demo CSV**. On JSON or CSV, the agent demo also lists structured fields and redacts one whole field before it continues.
+Open a local PDF, TXT, JSON, or CSV from the empty state, or click **Run agent demo** to load the synthetic contract. On JSON or CSV, the agent demo also lists structured fields and redacts one whole field before it continues.
 
 ## Test and vendor
 

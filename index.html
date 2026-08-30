@@ -94,15 +94,6 @@
         </div>
       </div>
     </div>
-
-    <div class="stats">
-      <div class="wrap stats-grid">
-        <div class="stat"><strong>0</strong><span>bytes of your document uploaded</span></div>
-        <div class="stat"><strong>10</strong><span>WebMCP tools registered</span></div>
-        <div class="stat"><strong>8</strong><span>detector categories, locally run</span></div>
-        <div class="stat"><strong>3</strong><span>independent checks before export</span></div>
-      </div>
-    </div>
   </section>
 
   <section class="split" id="boundary">
@@ -113,25 +104,39 @@
       <a class="textlink" href="./tools.html">See what each tool returns →</a>
     </div>
     <div class="split-light">
-      <div class="boundary-card can">
-        <h3><i class="sq"></i>What the agent receives</h3>
-        <ul class="boundary-list">
-          <li><code>type: "credit_card"</code><span class="tag">category</span></li>
-          <li><code>page: 3</code><span class="tag">page</span></li>
-          <li><code>confidence: 0.98</code><span class="tag">score</span></li>
-          <li><code>status: "redacted"</code><span class="tag">state</span></li>
-          <li><code>passed: true</code><span class="tag">verification</span></li>
-        </ul>
-      </div>
-      <div class="boundary-card cannot">
-        <h3><i class="sq"></i>What it never receives</h3>
-        <ul class="boundary-list">
-          <li><i class="mask"></i><span class="tag">the SSN</span></li>
-          <li><i class="mask"></i><span class="tag">the card number</span></li>
-          <li><i class="mask"></i><span class="tag">the API key</span></li>
-          <li><i class="mask"></i><span class="tag">document text</span></li>
-          <li><i class="mask"></i><span class="tag">artifact bytes</span></li>
-        </ul>
+      <div class="boundary-board">
+        <article class="boundary-pane is-open">
+          <header>
+            <span class="boundary-kicker">Returned</span>
+            <h3>What the agent receives</h3>
+            <p>Metadata only — enough to orchestrate, never enough to reconstruct.</p>
+          </header>
+          <table class="boundary-table" tabindex="0" aria-label="Returned metadata. Focus to redact.">
+            <tbody>
+              <tr><th scope="row">Category</th><td><span class="redactable">credit_card</span></td></tr>
+              <tr><th scope="row">Page</th><td><span class="redactable">3</span></td></tr>
+              <tr><th scope="row">Confidence</th><td><span class="redactable">0.98</span></td></tr>
+              <tr><th scope="row">Status</th><td><span class="redactable">redacted</span></td></tr>
+              <tr><th scope="row">Verification</th><td><span class="redactable">passed</span></td></tr>
+            </tbody>
+          </table>
+        </article>
+        <article class="boundary-pane is-sealed">
+          <header>
+            <span class="boundary-kicker">Withheld</span>
+            <h3>What it never receives</h3>
+            <p>Raw values stay in the tab. The tool result cannot contain them.</p>
+          </header>
+          <table class="boundary-table" tabindex="0" aria-label="Withheld values. Focus to redact.">
+            <tbody>
+              <tr><th scope="row">Social Security</th><td><span class="redactable">123-45-6789</span></td></tr>
+              <tr><th scope="row">Card number</th><td><span class="redactable">4111 1111 1111 1111</span></td></tr>
+              <tr><th scope="row">API key</th><td><span class="redactable">sk_live_51NORTHSTAR</span></td></tr>
+              <tr><th scope="row">Document text</th><td><span class="redactable">Employment Agreement…</span></td></tr>
+              <tr><th scope="row">Artifact bytes</th><td><span class="redactable">1.04 MB PDF</span></td></tr>
+            </tbody>
+          </table>
+        </article>
       </div>
     </div>
   </section>
@@ -197,7 +202,6 @@
   <section class="quote">
     <div class="wrap">
       <blockquote>“The agent knows there are seven SSNs.<em>It never knows what those SSNs are.”</em></blockquote>
-      <p class="attrib">The whole product, in one line</p>
     </div>
   </section>
 

@@ -7,7 +7,10 @@ import { createFindingRegistry } from "../src/registry.js";
 import { structuredFieldRanges, structuredFields } from "../src/structured.js";
 import { loadTextDocument, createTextArtifact } from "../src/textDocument.js";
 import { applyRedactions, exportSanitizedDocument, getVerificationCertificate, listStructuredFields, redactField, registerCustomPattern, scanDocumentPII, verifyRedaction } from "../src/tools.js";
-import { reconstructPageText, syntheticGroups, syntheticRange } from "../src/pdfDocument.js";
+import { reconstructPageText, syntheticGroups, syntheticRange, rebuildPdfDocumentText } from "../src/pdfDocument.js";
+import { remapFindingOffsets } from "../src/editor.js";
+import { writeTextDocument } from "../src/textDocument.js";
+import { asBytes, createMemoryStorage, createMemoryStore, createSession, WORKSPACE_VERSION } from "../src/session.js";
 
 test("Luhn accepts valid cards and rejects invalid cards", () => {
   assert.equal(isLuhnValid("4111 1111 1111 1111"), true);
@@ -531,4 +534,181 @@ test("JSON field redaction verifies and issues a certificate", async () => {
   assert.equal(verification.passed, true);
   assert.equal(verification.originalValuesFound, 0);
   assert.ok(verification.certificate);
+});
+
+test("editing remaps remaining findings and drops deleted values", () => {
+  const findings = [
+    { id: "finding_001", value: "123-45-6789", charStart: 10, charEnd: 21, offset: 10, length: 11 },
+    { id: "finding_002", value: "jordan@example.com", charStart: 30, charEnd: 48, offset: 30, length: 18 },
+  ];
+  const dropped = remapFindingOffsets(findings, "Contact jordan@example.com only");
+  assert.deepEqual(dropped, ["finding_001"]);
+  assert.equal(findings[1].charStart, 8);
+  assert.equal(findings[1].offset, 8);
+});
+
+test("writeTextDocument updates the local bytes", () => {
+  const document = { name: "note.txt", format: "txt" };
+  writeTextDocument(document, "hello");
+  assert.equal(document.text, "hello");
+  assert.equal(document.size, 5);
+});
+
+test("typed PDF notes are appended to the scannable text", () => {
+  const document = {
+    pages: [
+      { pageNumber: 1, start: 0, text: "Page one.\n" },
+      { pageNumber: 2, start: 10, text: "Page two.\n" },
+    ],
+    notes: [{ id: "note_1", page: 1, x: 40, y: 80, text: "123-45-6789" }],
+  };
+  rebuildPdfDocumentText(document);
+  assert.ok(document.text.includes("Page one."));
+  assert.ok(document.text.includes("123-45-6789"));
+  assert.equal(document.notes[0].offset, "Page one.\n".length);
+  assert.equal(document.pages[1].start, document.text.indexOf("Page two."));
+});
+
+test("registry hydrate restores records and continues the id sequence", () => {
+  const registry = createFindingRegistry();
+  registry.hydrate([
+    { id: "finding_004", type: "ssn", value: "123-45-6789", status: "redacted", confidence: 1 },
+  ]);
+  assert.equal(registry.get("finding_004").status, "redacted");
+  const added = registry.addManual({ type: "manual", value: "x", charStart: 0, charEnd: 1 });
+  assert.equal(added.id, "finding_005");
+});
+
+function createChannelHub() {
+  const peers = new Set();
+  return () => {
+    const node = {
+      onmessage: null,
+      postMessage(data) {
+        for (const peer of peers) {
+          if (peer !== node) peer.onmessage?.({ data });
+        }
+      },
+      close() {
+        peers.delete(node);
+      },
+    };
+    peers.add(node);
+    return node;
+  };
+}
+
+test("session restore keeps the workspace for the same tab token", async () => {
+  const sessionStorage = createMemoryStorage();
+  const store = createMemoryStore();
+  const createChannel = createChannelHub();
+  const first = createSession({ sessionStorage, store, createChannel, randomId: () => "tab-a", pingWaitMs: 0 });
+  const bytes = new TextEncoder().encode("SSN 123-45-6789");
+  await first.save({
+    document: { kind: "text", format: "txt", name: "note.txt", type: "text/plain", bytes },
+    findings: [{ id: "finding_001", type: "ssn", value: "123-45-6789", status: "redacted" }],
+    verification: { passed: true, certificate: { certificateId: "RDCT-TEST" } },
+  });
+  first.close();
+  const reloaded = createSession({ sessionStorage, store, createChannel, pingWaitMs: 0 });
+  const workspace = await reloaded.restore();
+  assert.equal(workspace.version, WORKSPACE_VERSION);
+  assert.equal(workspace.document.name, "note.txt");
+  assert.equal(new TextDecoder().decode(asBytes(workspace.document.bytes)), "SSN 123-45-6789");
+  assert.equal(workspace.findings[0].status, "redacted");
+  assert.equal(workspace.verification.certificate.certificateId, "RDCT-TEST");
+  reloaded.close();
+});
+
+test("a new tab does not restore a closed tab's original document", async () => {
+  const store = createMemoryStore();
+  const closed = createSession({
+    sessionStorage: createMemoryStorage(),
+    store,
+    createChannel: createChannelHub(),
+    randomId: () => "closed-tab",
+    pingWaitMs: 0,
+  });
+  await closed.save({
+    document: { kind: "text", format: "txt", name: "secret.txt", type: "text/plain", bytes: new Uint8Array([1, 2, 3]) },
+  });
+  closed.close();
+  const next = createSession({
+    sessionStorage: createMemoryStorage(),
+    store,
+    createChannel: createChannelHub(),
+    pingWaitMs: 0,
+  });
+  assert.equal(await next.restore(), null);
+  assert.deepEqual(await store.keys(), []);
+  next.close();
+});
+
+test("an open tab's workspace is not pruned by another tab", async () => {
+  const store = createMemoryStore();
+  const createChannel = createChannelHub();
+  const live = createSession({
+    sessionStorage: createMemoryStorage(),
+    store,
+    createChannel,
+    randomId: () => "live-tab",
+    pingWaitMs: 0,
+  });
+  await live.save({
+    document: { kind: "text", format: "txt", name: "live.txt", type: "text/plain", bytes: new Uint8Array([9]) },
+  });
+  const other = createSession({
+    sessionStorage: createMemoryStorage(),
+    store,
+    createChannel,
+    pingWaitMs: 0,
+  });
+  assert.equal(await other.restore(), null);
+  assert.deepEqual(await store.keys(), ["live-tab"]);
+  const restored = await live.restore();
+  assert.equal(restored.document.name, "live.txt");
+  live.close();
+  other.close();
+});
+
+test("session snapshot round-trips a verified text workspace", async () => {
+  const registry = createFindingRegistry();
+  const document = await loadTextDocument("SSN 123-45-6789");
+  const toolState = { artifact: null, verification: null, revision: 0, maskMode: "blackout", customPatterns: [] };
+  const context = { document, registry, state: toolState, callSource: "user", onFindingsChanged() {}, onVerificationChanged() {}, onStateChanged() {} };
+  await scanDocumentPII(context);
+  await applyRedactions(context, { targetIds: registry.all().map((finding) => finding.id) });
+  const verification = await verifyRedaction(context);
+  assert.equal(verification.passed, true);
+  const sessionStorage = createMemoryStorage();
+  const store = createMemoryStore();
+  const session = createSession({ sessionStorage, store, createChannel: createChannelHub(), randomId: () => "round-trip", pingWaitMs: 0 });
+  await session.save({
+    document: {
+      kind: document.kind,
+      format: document.format,
+      name: document.name,
+      type: document.type,
+      bytes: document.bytes,
+    },
+    findings: registry.all(),
+    artifact: {
+      kind: toolState.artifact.kind,
+      maskMode: toolState.artifact.maskMode,
+      revision: toolState.artifact.revision,
+      digest: toolState.artifact.digest,
+      type: toolState.artifact.blob.type,
+      bytes: asBytes(await toolState.artifact.blob.arrayBuffer()),
+    },
+    verification: toolState.verification,
+  });
+  const restored = await session.restore();
+  const hydrated = createFindingRegistry();
+  hydrated.hydrate(restored.findings);
+  assert.equal(hydrated.active().length, 1);
+  assert.equal(restored.verification.passed, true);
+  assert.ok(restored.verification.certificate.certificateId.startsWith("RDCT-"));
+  const artifactText = new TextDecoder().decode(asBytes(restored.artifact.bytes));
+  assert.equal(artifactText.includes("123-45-6789"), false);
+  session.close();
 });
