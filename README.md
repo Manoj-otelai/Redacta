@@ -10,75 +10,157 @@
 
 <p align="center">
   The WebMCP-native privacy boundary for AI agents.<br />
+  Built for the <a href="https://webmcp.devpost.com/">WebMCP Challenge</a>.
+</p>
+
+<p align="center">
   <a href="https://github.com/Manoj-otelai/Redacta">Source</a> ·
   <a href="app.html">Workspace</a> ·
+  <a href="app.html?demo=agent">Agent demo</a> ·
   <a href="ai.html">Machine-readable page</a>
 </p>
 
-Redacta is a browser-local, zero-backend document privacy workspace. An AI agent can inspect, scan, redact, verify, and export without receiving document contents or sensitive values.
+<p align="center">
+  <img alt="License: ISC" src="https://img.shields.io/badge/license-ISC-111816" />
+</p>
+
+Redacta lets an AI agent inspect, scan, redact, verify, and export a confidential PDF, TXT, JSON, or CSV **without ever receiving the document contents or the sensitive values**. Parsing, detection, masking, verification, and export all run inside the tab. There is no backend and no upload.
+
+The product in one line: the agent can know there are seven SSNs. It never knows what those SSNs are.
+
+## For judges
+
+Open the hosted workspace in **ChatGPT’s in-app browser** (WebMCP on by default) or **Chrome 149+** with `chrome://flags/#enable-webmcp-testing` enabled, then restart Chrome.
+
+1. Open `app.html`, or `app.html?demo=agent` to start the full run on load.
+2. If no file is loaded, use **Demo PDF** (or TXT / JSON / CSV) from the menu. Nothing is uploaded.
+3. With native WebMCP, the status chip reads **NATIVE WEBMCP** and ten tools are registered on `document.modelContext` or `navigator.modelContext`.
+4. Without the flag, **Demo Mode** exposes the same tools on `window` and in the **Console** pane — same schemas, same privacy projection.
+5. Click **Run agent demo**, or paste the prompt from the Agent pane into ChatGPT. Mutating calls (`applyRedactions`, `exportSanitizedDocument`, `registerCustomPattern`, `redactField`) stop for an in-page confirmation.
+6. On the **Agent** pane, expand **What the agent received**. Every payload is rescanned against detected values. A leak is treated as a bug, not a demo state.
+7. After a passing verify, the **Privacy** pane shows a metadata-only certificate (digest and check counts, no document text).
+8. Export stays blocked until verification passes all three checks.
+
+Suggested agent prompt (also copied from the workspace):
+
+```
+Inspect this document, scan it for SSNs, credit cards, emails and API keys, redact every finding, verify the sanitized copy, then export it. If the file is JSON or CSV, list its structured fields and redact the whole records[].card key.
+```
+
+## Why this is a WebMCP use case
+
+These are the four questions the challenge asks submissions to answer.
+
+**Why WebMCP is the right surface.** Redaction is a capability, not a reading task. An agent that scrapes the DOM, or that is handed the file, has already crossed the line the user is trying to protect. WebMCP lets the page publish *operations* — scan these categories, redact these finding IDs, verify the artifact, export only if it passed — while the values stay in a private in-memory registry. The tool API *is* the privacy boundary.
+
+**What is better for the human.** The person keeps a normal document workspace: drop a file, see findings, mark regions, approve or deny the agent. They do not paste a contract into a chat, and they do not trust a black rectangle drawn over live PDF text. The agent drives the workflow; the human stays the authority on mutate and export.
+
+**What people and agents can do together that was hard before.** Before WebMCP, the choice was “don’t use an agent on this file” or “give the agent the file.” Redacta is a third path: the agent can run a complete inspect → scan → redact → verify → export loop, including structured-field redaction on JSON/CSV and human-approved custom detectors, and the only thing that leaves the tab is metadata (IDs, categories, confidence, page numbers, pass/fail, a SHA-256 digest).
+
+**How WebMCP is implemented.** `src/ui.js` registers all ten tools with `document.modelContext.registerTool` or `navigator.modelContext.registerTool`:
+
+```js
+modelContext.registerTool({
+  name,
+  description: TOOL_DESCRIPTIONS[name],
+  inputSchema: TOOL_SCHEMAS[name],
+  execute: (input) => execute(name, input),
+});
+```
+
+Schemas and “never returns document contents or sensitive values” descriptions live in `src/tools.js`. Tool results are projected through a fixed whitelist in `src/registry.js` (`id`, `type`, `confidence`, `status`, `origin`, `page`). Agent-initiated mutations call `requestConfirmation` before they change anything.
 
 ## Privacy boundary
 
-The agent can see finding IDs, categories, confidence, status, coarse page numbers, counts, and operation results. It cannot see document contents, matched values, secrets, locations, offsets, geometry, raw errors, or generated artifact bytes. Raw detector values remain inside the private in-memory finding registry. Export is blocked until the current artifact passes byte-level verification.
+| The agent receives | The agent never receives |
+| --- | --- |
+| Finding IDs and counts | Document text |
+| Categories (`ssn`, `credit_card`, …) | Matched values and secrets |
+| Confidence and status | Locations, offsets, geometry |
+| Coarse page numbers | Artifact bytes |
+| Pass/fail and per-category remainder counts | Raw errors that could echo a value |
+| Certificate digest and numeric checks | Anything not on the safe-field whitelist |
+
+Raw detector values stay in the in-memory finding registry. Export is blocked until the current artifact passes byte-level verification. A live outbound-request counter is shown in the UI; a full demo run is expected to stay at zero.
+
+## WebMCP tools
+
+Registered on `document.modelContext` or `navigator.modelContext` when native WebMCP is available; Demo Mode otherwise. Every description states that contents and sensitive values are never returned.
+
+| Tool | What it does | What it returns |
+| --- | --- | --- |
+| `inspectDocument({})` | Local metadata | `fileType`, `filename`, `documentSize`, `pageCount`, `processingStatus` — no text |
+| `scanDocumentPII({categories?})` | Local detectors | Counts and projected findings — no values or locations |
+| `getFindingDetails({findingId})` | One finding | Category, confidence, status, origin, page |
+| `applyRedactions({targetIds?, maskMode?})` | Mask selected findings | `totalRedacted`, projected findings. **Human approval.** |
+| `verifyRedaction({categories?})` | Rescan artifact bytes and coverage | `passed`, `extractableFindings`, `unmaskedRegions`, `originalValuesFound`, per-category counts |
+| `exportSanitizedDocument({filename?})` | Download the artifact | Filename and `verified: true`. **Blocked until verify passes. Human approval.** |
+| `getVerificationCertificate({})` | Metadata-only proof | Digest, issued time, check counts — no contents |
+| `registerCustomPattern({name, pattern, flags?})` | Extra local detector (max 5) | Registered name and count. **Human approval.** Unsafe / empty / slow patterns are rejected first. |
+| `listStructuredFields({})` | JSON keys or CSV columns | Field names, occurrence counts, detected-finding counts — no values |
+| `redactField({field, maskMode?})` | Whole key or column | Counts and projected findings. **Human approval.** String JSON leaves and CSV cells only, so the artifact stays valid JSON. |
+
+Activity log entries store summarized arguments and the same privacy-safe results the agent received.
+
+Categories: `ssn`, `credit_card`, `email`, `phone`, `api_key`, `private_key`, `bearer_token`, `db_connection_string`, plus `custom:<name>` after a pattern is registered.
+
+Mask modes: `blackout` or `synthetic_replacement`. Synthetic mode substitutes plausible local placeholders. Verification excludes those placeholders from “remaining findings,” counts them separately, and still fails if any original raw value survives.
+
+## Verification (why export is locked)
+
+App state is never treated as proof. Verification re-reads the generated Blob and reports three independent checks:
+
+- **`extractableFindings`** — detectors still fire on the artifact bytes
+- **`unmaskedRegions`** — findings still marked pending in the registry
+- **`originalValuesFound`** — original raw strings still appear in the artifact
+
+A rasterized PDF has no text layer, so a text rescan alone would pass while a skipped bar is still visible. Any of the three checks failing blocks export. Export also re-checks the SHA-256 digest so a file changed after verification cannot be downloaded as verified.
+
+A passing run can issue a certificate (`RDCT-…`) with the digest, document metadata, and numeric results — never document text or finding values.
 
 ## Run locally
 
-Serve the repository root with either:
+No build step. Serve the repository root:
 
-```powershell
+```bash
 npx serve .
+# or
 python -m http.server 4173
 ```
 
-Open the displayed local URL. `index.html` is the landing page; the workspace is `app.html`, and `app.html?demo=agent` starts the full agent run on load. No build step is required. Netlify publishes the repository root via `netlify.toml`. Fonts (`assets/fonts/`) and landing artwork (`assets/img/`) are served from the repository, so the pages make no external requests.
-`ai.html` is the machine-readable rendering of the landing page, toggled from the bottom pill on either page.
-The app menu includes `Demo TXT`, `Demo PDF`, and `Demo JSON`; the JSON option loads a synthetic employee record set locally. When the loaded document is JSON or CSV, the agent demo additionally lists its structured fields and redacts a whole field before continuing the run.
+Open the printed URL.
+
+| URL | Page |
+| --- | --- |
+| `/` (`index.html`) | Landing |
+| `/app.html` | Workspace |
+| `/app.html?demo=agent` | Workspace, agent run starts on load |
+| `/ai.html` | Machine-readable twin of the landing page |
+
+Fonts and landing artwork ship in `assets/`, so the pages make no external requests. Netlify (`netlify.toml`) and Vercel (`vercel.json`) publish the repository root as static files.
+
+The File menu loads local files or synthetic demos: **Demo TXT**, **Demo PDF**, **Demo JSON**, **Demo CSV**. On JSON or CSV, the agent demo also lists structured fields and redacts one whole field before it continues.
 
 ## Test and vendor
 
-```powershell
+```bash
 npm ci
 npm run vendor
 npm test
 ```
 
-`vendor/` contains the exact `pdfjs-dist@6.2.108` and `pdf-lib@1.17.1` browser artifacts. Runtime code makes no third-party requests.
-
-## WebMCP tools
-
-All ten tools are registered on `document.modelContext` or `navigator.modelContext` when native WebMCP is available, and are exposed in Demo Mode otherwise. Every description promises that contents and sensitive values are never returned.
-
-- `inspectDocument({})` — local metadata; returns `fileType`, `filename`, human-readable `documentSize`, `pageCount`, and `processingStatus`.
-- `scanDocumentPII({categories?: ["ssn", "credit_card", "email", "phone", "api_key", "private_key", "bearer_token", "db_connection_string"]})` — privacy-safe findings.
-- `applyRedactions({targetIds?: string[], maskMode?: "blackout"|"synthetic_replacement"})` — applies selected findings and creates the artifact.
-- `verifyRedaction({categories?: [...]})` — rescans artifact bytes and checks mask coverage; returns `passed`, `remainingFindings` as a count, `extractableFindings`, `unmaskedRegions`, projected `remaining`/`unmasked` findings, and per-category counts.
-- `getFindingDetails({findingId: string})` — returns one projected finding.
-- `exportSanitizedDocument({filename?: string})` — downloads only after verification passes.
-
-- `getVerificationCertificate({})` - returns metadata-only proof for a verified artifact, including its digest and check counts.
-- `registerCustomPattern({name, pattern, flags?})` - registers a local custom detector after human approval; returns only the registered name and count.
-- `listStructuredFields({})` - lists JSON keys or CSV columns with occurrence counts and detected-finding counts, never values.
-- `redactField({field, maskMode?})` - redacts every string value of one JSON key or every cell in one CSV column locally after human approval.
-
-Mutating agent calls require an in-page human confirmation. Activity entries contain only summarized arguments and the privacy-safe results returned to the agent.
-
-Custom patterns are limited to five registered definitions and run locally; their results expose counts and metadata only and never document contents or sensitive values. Every agent-initiated registration requires human approval, and validation rejects unsafe, empty, uncompilable, or slow patterns before the approval prompt.
-
-Structured-field tools execute locally and never return document contents or sensitive values. Only string JSON leaves and CSV cells are redactable; non-string JSON leaves remain untouched so the sanitized artifact stays valid JSON. Agent-initiated field redactions require human approval.
-
-## Synthetic replacement and certificates
-
-Synthetic replacement keeps the document readable with plausible local placeholders. Verification recognizes those placeholders and reports their count separately, while also checking that none of the original raw values remain anywhere in the artifact; either an original value or an uncovered region fails verification. A passing run can issue a metadata-only certificate with the artifact digest, document metadata, and numeric check results, never document text or finding values.
+`vendor/` holds the exact `pdfjs-dist@6.2.108` and `pdf-lib@1.17.1` browser artifacts. Runtime code makes no third-party requests.
 
 ## Architecture decisions
 
-- **Plain ES modules, no framework or bundler:** static hosting keeps the product inspectable and avoids a build-time dependency surface.
-- **Vendored PDF engines:** exact pdf.js and pdf-lib versions are copied into `vendor/`, so document data never needs a CDN or third-party runtime request.
-- **Worker scanning:** detector work runs in a module worker and reports progress by detector category.
-- **Layered detectors:** regex candidates are followed by structural validation (Luhn, SSN ranges, key/token/connection shapes) and confidence scoring.
-- **Rasterized PDF export:** every source page is rendered to a canvas, padded whole-item masks are baked into PNGs, and a new image-only PDF is built. This removes the text layer and avoids under-redaction from interpolated character geometry.
-- **Manual marking accessibility:** manual region marking on PDFs currently requires a pointer, while text documents support keyboard selection and Enter to commit.
-- **Artifact-byte verification:** verification re-reads the generated Blob, extracts text from PDFs, decodes text artifacts, and rescans the resulting bytes. App state is never treated as proof.
-- **Mask-coverage verification:** a rasterized PDF has no text layer, so a text rescan alone would pass while a skipped finding is still legible in the page image. Verification therefore reports three checks separately (`extractableFindings`, `unmaskedRegions`, `originalValuesFound`), and any of them failing blocks export.
-- **Explicit privacy projection:** the finding registry stores raw values privately and exposes only a fixed safe-field whitelist to tools, UI activity, and errors.
-- **Synthetic replacement and certificates:** synthetic mode substitutes plausible local placeholders while verification excludes those known placeholders from remaining findings and separately counts them. A passing run can issue a metadata-only certificate containing the artifact digest, document metadata, and check counts; it contains no document text or values.
+- **Plain ES modules, no framework or bundler.** Static hosting keeps the product inspectable and avoids a build-time dependency surface.
+- **Vendored PDF engines.** Document bytes never need a CDN.
+- **Worker scanning.** Detectors run in a module worker and report progress by category.
+- **Layered detectors.** Regex candidates, then structural validation (Luhn, SSN ranges, key / token / connection shapes), then confidence scoring.
+- **Rasterized PDF export.** Each page is rendered to a canvas, padded whole-item masks are baked into PNGs, and a new image-only PDF is built. That removes the text layer so a black rectangle over live glyphs is not mistaken for a redaction.
+- **Manual marking.** Pointer drag on PDFs; text documents also support keyboard selection and Enter to commit.
+- **Explicit privacy projection.** The registry stores raw values privately and exposes only the safe-field whitelist to tools, UI activity, and errors.
+
+## License
+
+[ISC](./LICENSE). Copyright © 2026 Manoj Kumar.
