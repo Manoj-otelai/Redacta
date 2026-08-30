@@ -555,7 +555,7 @@ button, input, select, textarea { font: inherit; }
 .agent-step {
   display: grid;
   grid-template-columns: 18px auto minmax(0, 1fr);
-  align-items: center;
+  align-items: start;
   gap: 9px;
   padding: 6px 9px;
   border: 1px solid transparent;
@@ -576,13 +576,12 @@ button, input, select, textarea { font: inherit; }
 }
 .step-label { white-space: nowrap; }
 .step-note {
-  overflow: hidden;
   min-width: 0;
   color: var(--ink-muted);
   font: 10px var(--mono);
+  line-height: 1.35;
   text-align: right;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
 }
 .agent-step.is-pending { color: #9a968f; }
 .agent-step.is-running { border-color: #c3c1f8; background: var(--iris-soft); color: var(--iris-dark); font-weight: 500; }

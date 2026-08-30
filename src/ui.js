@@ -61,9 +61,15 @@ const demoJson = JSON.stringify({
     record_count: 3,
   },
 }, null, 2);
+const demoCsv = `employee_id,ssn,email,phone,card,integration_token,notes
+EMP-200001,456-78-9012,zoe.martin@northstar.example,(415) 555-0111,4012 8888 8888 1881,sk_live_51NORTHSTAR_5rs8d,"Contractor, part-time"
+EMP-200002,567-89-0123,noah.kim@northstar.example,(415) 555-0112,4222 2222 2222 2222,sk_live_51NORTHSTAR_6tu9e,"Full-time, remote"
+EMP-200003,678-90-1234,sofia.reyes@northstar.example,(415) 555-0113,3782 822463 10005,sk_live_51NORTHSTAR_7vw1f,"Finance, manager"
+EMP-200004,789-01-2345,eli.brooks@northstar.example,(415) 555-0114,6011 1111 1111 1117,sk_live_51NORTHSTAR_8xy2g,"Engineering, on-call"`;
 
 const loadDemoText = async () => loadDocument(await loadTextDocument(new File([demoText], "confidential-employment-contract.txt", { type: "text/plain" })));
 const loadDemoJson = async () => loadDocument(await loadTextDocument(new File([demoJson], "redacta-demo-records.json", { type: "application/json" })));
+const loadDemoCsv = async () => loadDocument(await loadTextDocument(new File([demoCsv], "redacta-demo-records.csv", { type: "text/csv" })));
 const loadDemoPdf = async () => loadDocument(await loadPdfDocument(await createDemoPdf()));
 const toolMap = { inspectDocument, scanDocumentPII, applyRedactions, verifyRedaction, getFindingDetails, exportSanitizedDocument, getVerificationCertificate, registerCustomPattern, listStructuredFields, redactField };
 const state = { document: null, artifact: null, verification: null, structuredFields: [], customPatterns: [], maskMode: "blackout", revision: 0, lastRedactionBatch: [], manualMode: false, pdfPage: 1, zoom: 1 };
@@ -801,6 +807,7 @@ function renderAgentSteps() {
     const note = document.createElement("span");
     note.className = "step-note";
     note.textContent = agentRun.notes.get(step.key) ?? "";
+    note.title = note.textContent;
     item.append(mark, label, note);
     return item;
   }));
@@ -1036,6 +1043,7 @@ export function initUI() {
   $("scanButton").addEventListener("click", runScan);
   $("loadDemoButton").addEventListener("click", loadDemoText);
   $("menuDemoJson").addEventListener("click", loadDemoJson);
+  $("menuDemoCsv").addEventListener("click", loadDemoCsv);
   $("loadDemoPdfButton").addEventListener("click", loadDemoPdf);
   $("menuDemoText").addEventListener("click", loadDemoText);
   $("menuDemoPdf").addEventListener("click", loadDemoPdf);
