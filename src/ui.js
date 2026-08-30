@@ -76,7 +76,7 @@ const AGENT_STEPS = [
   { key: "verifyRedaction", label: "Verify sanitized copy" },
   { key: "exportSanitizedDocument", label: "Export verified copy" },
 ];
-const agentRun = { active: false, statuses: new Map(), notes: new Map() };
+const agentRun = { active: false, steps: AGENT_STEPS, statuses: new Map(), notes: new Map() };
 const $ = (id) => document.getElementById(id);
 const plural = (count, noun) => `${count} ${noun}${count === 1 ? "" : "s"}`;
 const ZOOM_STEPS = [0.5, 0.67, 0.8, 1, 1.25, 1.5, 2];
@@ -198,6 +198,10 @@ function summarizeResult(name, result) {
       return [result.fileType, plural(result.pageCount ?? 1, "page"), result.documentSize].filter(Boolean).join(" · ");
     case "scanDocumentPII":
       return `${plural(safe.totalDetected ?? 0, "finding")} detected`;
+    case "listStructuredFields":
+      return `${plural(result.fields?.length ?? 0, "field")} listed`;
+    case "redactField":
+      return [result.field, plural(result.valuesRedacted ?? 0, "value")].filter(Boolean).join(" · ");
     case "applyRedactions":
       return `${plural(safe.totalRedacted ?? 0, "region")} masked · ${safe.maskMode}`;
     case "verifyRedaction":
@@ -783,7 +787,7 @@ function activatePane(name) {
 function renderAgentSteps() {
   const list = $("agentSteps");
   if (!list) return;
-  list.replaceChildren(...AGENT_STEPS.map((step) => {
+  list.replaceChildren(...(agentRun.steps ?? AGENT_STEPS).map((step) => {
     const status = agentRun.statuses.get(step.key) ?? "pending";
     const item = document.createElement("li");
     item.className = `agent-step is-${status}`;
@@ -814,6 +818,7 @@ function updateAgentDemoButtons() {
 async function runAgentDemo() {
   if (agentRun.active) return;
   agentRun.active = true;
+  agentRun.steps = AGENT_STEPS;
   agentRun.statuses = new Map();
   agentRun.notes = new Map();
   activatePane("agent");
@@ -822,8 +827,18 @@ async function runAgentDemo() {
   let currentStep = null;
   try {
     if (!state.document) await loadDemoPdf();
-    for (let index = 0; index < AGENT_STEPS.length; index += 1) {
-      const step = AGENT_STEPS[index];
+    agentRun.steps = [...AGENT_STEPS];
+    if (["json", "csv"].includes(state.document.format) && state.structuredFields.length > 0) {
+      const scanIndex = agentRun.steps.findIndex(({ key }) => key === "scanDocumentPII");
+      agentRun.steps.splice(scanIndex + 1, 0,
+        { key: "listStructuredFields", label: "List structured fields" },
+        { key: "redactField", label: "Redact a whole field" },
+      );
+    }
+    renderAgentSteps();
+    let structuredFieldResult = null;
+    for (let index = 0; index < agentRun.steps.length; index += 1) {
+      const step = agentRun.steps[index];
       currentStep = step;
       agentRun.statuses.set(step.key, "running");
       renderAgentSteps();
@@ -835,19 +850,38 @@ async function runAgentDemo() {
               .map((finding) => finding.id),
             maskMode: state.maskMode,
           }
+        : step.key === "redactField"
+          ? (() => {
+              const fields = structuredFieldResult?.fields ?? [];
+              if (!structuredFieldResult || structuredFieldResult.status !== "success" || !fields.length) return null;
+              const selected = fields.reduce((best, field) => (
+                !best || field.detectedFindings > best.detectedFindings ? field : best
+              ), null);
+              return { field: selected.field, maskMode: state.maskMode };
+            })()
         : step.key === "exportSanitizedDocument"
           ? { filename: `redacta-sanitized.${state.document.format}` }
           : {};
       let result;
       if (step.key === "scanDocumentPII") setScanProgress(0);
       try {
-        result = await executeTool(step.key, args, "agent");
+        if (step.key === "redactField" && !args) {
+          result = structuredFieldResult
+            ? { status: "failed", message: structuredFieldResult.status }
+            : { status: "failed", message: "No structured field result." };
+        } else {
+          result = await executeTool(step.key, args, "agent");
+        }
       } finally {
         if (step.key === "scanDocumentPII") setScanProgress(null);
       }
+      if (step.key === "listStructuredFields") structuredFieldResult = result;
       const success = ["success", "verified"].includes(result.status);
       agentRun.statuses.set(step.key, success ? "done" : "failed");
-      agentRun.notes.set(step.key, success ? summarizeResult(step.key, result) : result.status);
+      const failureStatus = step.key === "redactField" && !args
+        ? structuredFieldResult?.status ?? result.status
+        : result.status;
+      agentRun.notes.set(step.key, success ? summarizeResult(step.key, result) : failureStatus);
       renderAgentSteps();
       if (step.key === "applyRedactions" && success) {
         state.lastRedactionBatch = args.targetIds;
@@ -857,9 +891,9 @@ async function runAgentDemo() {
         toast(result.status === "denied" ? "Agent request denied — the run stopped." : "The agent run stopped — nothing was exported.");
         break;
       }
-      if (index < AGENT_STEPS.length - 1) await new Promise((resolve) => setTimeout(resolve, 320));
+      if (index < agentRun.steps.length - 1) await new Promise((resolve) => setTimeout(resolve, 320));
     }
-    if (AGENT_STEPS.every((step) => agentRun.statuses.get(step.key) === "done")) {
+    if (agentRun.steps.every((step) => agentRun.statuses.get(step.key) === "done")) {
       toast("Agent run complete · verified copy exported locally");
     }
   } catch {
