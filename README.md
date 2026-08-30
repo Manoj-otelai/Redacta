@@ -14,15 +14,18 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/Manoj-otelai/Redacta">Source</a> ·
-  <a href="app.html">Workspace</a> ·
-  <a href="app.html?demo=agent">Agent demo</a> ·
-  <a href="ai.html">Machine-readable page</a>
+  <a href="https://redacta-theta.vercel.app/">Live app</a> ·
+  <a href="https://redacta-theta.vercel.app/app.html">Workspace</a> ·
+  <a href="https://redacta-theta.vercel.app/app.html?demo=agent">Agent demo</a> ·
+  <a href="https://redacta-theta.vercel.app/ai.html">Machine-readable page</a> ·
+  <a href="https://github.com/Manoj-otelai/Redacta">Source</a>
 </p>
 
 <p align="center">
   <img alt="License: ISC" src="https://img.shields.io/badge/license-ISC-111816" />
 </p>
+
+**Live:** [https://redacta-theta.vercel.app/](https://redacta-theta.vercel.app/)
 
 Redacta lets an AI agent inspect, scan, redact, verify, and export a confidential PDF, TXT, JSON, or CSV **without ever receiving the document contents or the sensitive values**. Parsing, detection, masking, verification, and export all run inside the tab. There is no backend and no upload.
 
@@ -30,15 +33,24 @@ The product in one line: the agent can know there are seven SSNs. It never knows
 
 ## For judges
 
-Open the hosted workspace in **ChatGPT’s in-app browser** (WebMCP on by default) or **Chrome 149+** with `chrome://flags/#enable-webmcp-testing` enabled, then restart Chrome.
+Open the live app in **ChatGPT’s in-app browser** (WebMCP on by default) or **Chrome 149+** with `chrome://flags/#enable-webmcp-testing` enabled, then restart Chrome.
 
-1. Open `app.html`, or `app.html?demo=agent` to start the full run on load.
+| What | URL |
+| --- | --- |
+| Landing | [https://redacta-theta.vercel.app/](https://redacta-theta.vercel.app/) |
+| Workspace | [https://redacta-theta.vercel.app/app.html](https://redacta-theta.vercel.app/app.html) |
+| Agent demo (starts on load) | [https://redacta-theta.vercel.app/app.html?demo=agent](https://redacta-theta.vercel.app/app.html?demo=agent) |
+| Machine-readable landing | [https://redacta-theta.vercel.app/ai.html](https://redacta-theta.vercel.app/ai.html) |
+| WebMCP tools | [https://redacta-theta.vercel.app/tools.html](https://redacta-theta.vercel.app/tools.html) |
+| Source | [https://github.com/Manoj-otelai/Redacta](https://github.com/Manoj-otelai/Redacta) |
+
+1. Open the [workspace](https://redacta-theta.vercel.app/app.html), or the [agent demo](https://redacta-theta.vercel.app/app.html?demo=agent) to start the full run on load.
 2. Open a local PDF, TXT, JSON, or CSV — or click **Run agent demo**, which loads the synthetic contract. Nothing is uploaded.
 3. With native WebMCP, the status chip reads **NATIVE WEBMCP** and ten tools are registered on `document.modelContext` or `navigator.modelContext`.
 4. Without the flag, **Demo Mode** exposes the same tools on `window` and in the **Console** pane — same schemas, same privacy projection.
-5. Click **Run agent demo**, or paste the prompt from the Agent pane into ChatGPT. Mutating calls (`applyRedactions`, `exportSanitizedDocument`, `registerCustomPattern`, `redactField`) stop for an in-page confirmation.
+5. Click **Run agent demo**, or paste the prompt from the **Agent** pane into ChatGPT. Mutating calls (`applyRedactions`, `exportSanitizedDocument`, `registerCustomPattern`, `redactField`) stop for an in-page confirmation.
 6. On the **Agent** pane, expand **What the agent received**. Every payload is rescanned against detected values. A leak is treated as a bug, not a demo state.
-7. After a passing verify, the **Privacy** pane shows a metadata-only certificate (digest and check counts, no document text).
+7. After a passing verify, the **Redact** pane shows **Verification passed** and the metadata-only certificate id (`Certified RDCT-…` plus a short digest). No document text.
 8. Export stays blocked until verification passes all three checks.
 
 Suggested agent prompt (also copied from the workspace):
@@ -81,7 +93,7 @@ Schemas and “never returns document contents or sensitive values” descriptio
 | Pass/fail and per-category remainder counts | Raw errors that could echo a value |
 | Certificate digest and numeric checks | Anything not on the safe-field whitelist |
 
-Raw detector values stay in the in-memory finding registry. Export is blocked until the current artifact passes byte-level verification. A live outbound-request counter is shown in the UI; a full demo run is expected to stay at zero.
+Raw detector values stay in the in-memory finding registry. Export is blocked until the current artifact passes byte-level verification.
 
 ## WebMCP tools
 
@@ -128,16 +140,17 @@ npx serve .
 python -m http.server 4173
 ```
 
-Open the printed URL.
+The production app is [https://redacta-theta.vercel.app/](https://redacta-theta.vercel.app/). Local paths match that host:
 
-| URL | Page |
+| Local | Live |
 | --- | --- |
-| `/` (`index.html`) | Landing |
-| `/app.html` | Workspace |
-| `/app.html?demo=agent` | Workspace, agent run starts on load |
-| `/ai.html` | Machine-readable twin of the landing page |
+| `/` | [https://redacta-theta.vercel.app/](https://redacta-theta.vercel.app/) |
+| `/app.html` | [https://redacta-theta.vercel.app/app.html](https://redacta-theta.vercel.app/app.html) |
+| `/app.html?demo=agent` | [https://redacta-theta.vercel.app/app.html?demo=agent](https://redacta-theta.vercel.app/app.html?demo=agent) |
+| `/ai.html` | [https://redacta-theta.vercel.app/ai.html](https://redacta-theta.vercel.app/ai.html) |
+| `/tools.html` | [https://redacta-theta.vercel.app/tools.html](https://redacta-theta.vercel.app/tools.html) |
 
-Fonts and landing artwork ship in `assets/`, so the pages make no external requests. Netlify (`netlify.toml`) and Vercel (`vercel.json`) publish the repository root as static files.
+Fonts and landing artwork ship in `assets/`, so the pages make no external requests. Vercel (`vercel.json`) and Netlify (`netlify.toml`) publish the repository root as static files.
 
 Open a local PDF, TXT, JSON, or CSV from the empty state, or click **Run agent demo** to load the synthetic contract. On JSON or CSV, the agent demo also lists structured fields and redacts one whole field before it continues.
 
@@ -155,7 +168,7 @@ npm test
 
 - **Plain ES modules, no framework or bundler.** Static hosting keeps the product inspectable and avoids a build-time dependency surface.
 - **Vendored PDF engines.** Document bytes never need a CDN.
-- **Worker scanning.** Detectors run in a module worker and report progress by category.
+- **Worker scanning.** Detectors run in a Web Worker and report progress by category.
 - **Layered detectors.** Regex candidates, then structural validation (Luhn, SSN ranges, key / token / connection shapes), then confidence scoring.
 - **Rasterized PDF export.** Each page is rendered to a canvas, padded whole-item masks are baked into PNGs, and a new image-only PDF is built. That removes the text layer so a black rectangle over live glyphs is not mistaken for a redaction.
 - **Manual marking.** Pointer drag on PDFs; text documents also support keyboard selection and Enter to commit.
