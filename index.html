@@ -74,7 +74,6 @@
   <span class="k">"id"</span>: <span class="s">"finding_004"</span>,
   <span class="k">"type"</span>: <span class="s">"ssn"</span>,
   <span class="k">"page"</span>: <span class="n">2</span>,
-  <span class="k">"location"</span>: <span class="s">"page 2, region B"</span>,
   <span class="k">"confidence"</span>: <span class="n">0.99</span>,
   <span class="k">"status"</span>: <span class="s">"redacted"</span>
 }</pre>
@@ -121,7 +120,7 @@
         <h3><i class="sq"></i>What the agent receives</h3>
         <ul class="boundary-list">
           <li><code>type: "credit_card"</code><span class="tag">category</span></li>
-          <li><code>page: 3, region C</code><span class="tag">location</span></li>
+          <li><code>page: 3</code><span class="tag">page</span></li>
           <li><code>confidence: 0.98</code><span class="tag">score</span></li>
           <li><code>status: "redacted"</code><span class="tag">state</span></li>
           <li><code>passed: true</code><span class="tag">verification</span></li>
@@ -248,13 +247,13 @@
       </div>
       <div class="tool-list">
         <div class="tool"><code>inspectDocument</code><p>File type, page count, size, readiness. <b>No text.</b></p></div>
-        <div class="tool"><code>scanDocumentPII</code><p>Counts, IDs, categories, locations, confidence. <b>No matched values.</b></p></div>
-        <div class="tool"><code>getFindingDetails</code><p>One projected finding — a bounding box on PDFs, character offsets in text. <b>Still no value.</b></p></div>
+        <div class="tool"><code>scanDocumentPII</code><p>Counts, IDs, categories, confidence, status and page numbers. <b>No matched values or locations.</b></p></div>
+        <div class="tool"><code>getFindingDetails</code><p>One projected finding - category, confidence, status and page. <b>No value, location or offsets.</b></p></div>
         <div class="tool"><code>applyRedactions</code><p>Masks the selected findings locally. <b>Requires human approval.</b></p></div>
         <div class="tool"><code>verifyRedaction</code><p>Rescans artifact bytes and mask coverage, including original-value absence. <b>Returns pass or fail, per category.</b></p></div>
         <div class="tool"><code>exportSanitizedDocument</code><p>Downloads the sanitized copy. <b>Blocked until verification passes.</b></p></div>
         <div class="tool"><code>getVerificationCertificate</code><p>Returns metadata-only proof for a verified artifact. <b>Never includes document contents or values.</b></p></div>
-        <div class="tool"><code>registerCustomPattern</code><p>Registers a local detector from a validated pattern. <b>Requires human approval; returns counts and locations only.</b></p></div>
+        <div class="tool"><code>registerCustomPattern</code><p>Registers a local detector from a validated pattern. <b>Requires human approval; returns counts and metadata only.</b></p></div>
         <div class="tool"><code>listStructuredFields</code><p>Lists JSON keys or CSV columns with occurrence counts. <b>Never returns contents or values.</b></p></div>
         <div class="tool"><code>redactField</code><p>Redacts every value of one JSON key or CSV column locally. <b>Requires human approval.</b></p></div>
       </div>

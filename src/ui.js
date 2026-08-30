@@ -215,7 +215,7 @@ function summarizeResult(name, result) {
         ? `passed · 0 remaining across ${Object.keys(safe.categories ?? {}).length} categories`
         : `failed · ${plural(safe.remainingFindings ?? 0, "finding")} remaining`;
     case "getFindingDetails":
-      return [result.type, result.location].filter(Boolean).join(" · ") || "finding not found";
+      return [result.type, result.id].filter(Boolean).join(" · ") || "finding not found";
     case "exportSanitizedDocument":
       return `${safe.filename} · verified`;
     case "getVerificationCertificate":

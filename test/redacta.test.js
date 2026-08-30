@@ -112,6 +112,10 @@ test("tool payload projection never contains planted sensitive values", async ()
   assert.equal(payload.includes("jordan@example.com"), false);
   assert.equal(payload.includes("4111 1111 1111 1111"), false);
   assert.equal(result.findings.every((finding) => !("value" in finding)), true);
+  assert.deepEqual(Object.keys(result.findings[0]).sort(), ["confidence", "id", "origin", "page", "status", "type"]);
+  for (const field of ["location", "charStart", "charEnd", "boundingBox"]) {
+    assert.equal(field in result.findings[0], false);
+  }
   const activity = JSON.stringify({ args: { targetIds: result.findings.map((finding) => finding.id) }, result });
   assert.equal(activity.includes("123-45-6789"), false);
   const failure = await applyRedactions({ document: null, registry, state: {}, onStateChanged() {} }, { targetIds: [] });

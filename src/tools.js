@@ -34,7 +34,7 @@ export const TOOL_DESCRIPTIONS = {
   getFindingDetails: "Retrieve privacy-safe details for one finding; never returns document contents or sensitive values.",
   exportSanitizedDocument: "Download the verified local artifact; never returns document contents or sensitive values.",
   getVerificationCertificate: "Retrieve metadata-only proof that the local artifact passed verification; never returns document contents or sensitive values.",
-  registerCustomPattern: "Register a custom pattern locally after human approval; results expose counts and locations only and never include document contents or sensitive values.",
+  registerCustomPattern: "Register a custom pattern locally after human approval; results expose counts and metadata only and never include document contents or sensitive values.",
   listStructuredFields: "List the structural keys or columns of a local JSON or CSV document with occurrence counts; returns field names and counts only, never document contents or sensitive values.",
   redactField: "Redact every value of one JSON key or CSV column locally after human approval; never returns document contents or sensitive values.",
 };

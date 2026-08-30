@@ -1,4 +1,4 @@
-const SAFE_FIELDS = ["id", "type", "page", "location", "boundingBox", "charStart", "charEnd", "confidence", "status", "origin"];
+const SAFE_FIELDS = ["id", "type", "confidence", "status", "origin", "page"];
 
 export function createFindingRegistry() {
   const records = new Map();

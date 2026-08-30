@@ -19,7 +19,7 @@ Redacta is a browser-local, zero-backend document privacy workspace. An AI agent
 
 ## Privacy boundary
 
-The agent can see metadata, finding IDs, categories, safe locations, confidence, counts, verification status, and operation results. It cannot see document contents, matched values, secrets, raw errors, or generated artifact bytes. Raw detector values remain inside the private in-memory finding registry. Export is blocked until the current artifact passes byte-level verification.
+The agent can see finding IDs, categories, confidence, status, coarse page numbers, counts, and operation results. It cannot see document contents, matched values, secrets, locations, offsets, geometry, raw errors, or generated artifact bytes. Raw detector values remain inside the private in-memory finding registry. Export is blocked until the current artifact passes byte-level verification.
 
 ## Run locally
 
@@ -62,7 +62,7 @@ All ten tools are registered on `document.modelContext` when native WebMCP is av
 
 Mutating agent calls require an in-page human confirmation. Activity entries contain only summarized arguments and the privacy-safe results returned to the agent.
 
-Custom patterns are limited to five registered definitions and run locally; their results expose counts and locations only and never document contents or sensitive values. Every agent-initiated registration requires human approval, and validation rejects unsafe, empty, uncompilable, or slow patterns before the approval prompt.
+Custom patterns are limited to five registered definitions and run locally; their results expose counts and metadata only and never document contents or sensitive values. Every agent-initiated registration requires human approval, and validation rejects unsafe, empty, uncompilable, or slow patterns before the approval prompt.
 
 Structured-field tools execute locally and never return document contents or sensitive values. Only string JSON leaves and CSV cells are redactable; non-string JSON leaves remain untouched so the sanitized artifact stays valid JSON. Agent-initiated field redactions require human approval.
 

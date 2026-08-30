@@ -72,7 +72,7 @@ document confidential never cross the boundary.
 
 What the agent receives:
   type: "credit_card"      category
-  page: 3, region C        location
+  page: 3                  page
   confidence: 0.98         score
   status: "redacted"       state
   passed: true             verification
@@ -141,11 +141,11 @@ Demo Mode console when it isn't — the same tools, the same boundary.
 <span class="m-signature">inspectDocument({})</span>
   → fileType, pageCount, documentSize, processingStatus.  No text.
 <span class="m-signature">scanDocumentPII({categories?})</span>
-  → totalDetected, findings[{id, type, page, location, confidence}].
+  → totalDetected, findings[{id, type, confidence, status, origin, page}].
     No matched values.
 <span class="m-signature">getFindingDetails({findingId})</span>
-  → one projected finding: a boundingBox on PDFs, character offsets in
-    text.  Still no value.
+  → one projected finding: category, confidence, status, origin and page.
+    No value, location or offsets.
 <span class="m-signature">applyRedactions({targetIds?, maskMode?})</span>
   → totalRedacted.  Requires human approval.
 <span class="m-signature">verifyRedaction({categories?})</span>
@@ -159,7 +159,7 @@ Demo Mode console when it isn't — the same tools, the same boundary.
 <span class="m-signature">registerCustomPattern({name, pattern, flags?})</span>
   &rarr; validates and registers a local detector.  Requires human approval.
 
-  results expose counts and locations only, never contents or values.
+  results expose counts and metadata only, never contents or values.
 <span class="m-signature">listStructuredFields({})</span>
   &rarr; lists JSON keys or CSV columns with occurrence counts only.
 <span class="m-signature">redactField({field, maskMode?})</span>

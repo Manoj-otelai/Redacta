@@ -109,7 +109,7 @@
               <span class="task-count" id="findingTotal">0 found</span>
             </header>
             <div class="task-scroll">
-              <p class="task-hint">Findings are detected locally. The agent receives categories, locations and confidence — never the values.</p>
+              <p class="task-hint">Findings are detected locally. The agent receives IDs, categories, confidence, status and page numbers — never values or locations.</p>
               <div class="scan-progress" id="scanProgress" hidden>
                 <div class="scan-progress-head">Scanning locally <strong id="scanPercent">0%</strong></div>
                 <div class="scan-track" id="scanTrack" role="progressbar" aria-label="Local scan progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span id="scanBar"></span></div>
@@ -225,7 +225,7 @@
                 </div>
               </article>
               <p class="tiny-label">Agent can see</p>
-              <ul class="safe-list"><li>Finding counts</li><li>Categories &amp; locations</li><li>Confidence scores</li><li>Verification status</li></ul>
+              <ul class="safe-list"><li>Finding IDs and counts</li><li>Categories and page numbers</li><li>Confidence scores</li><li>Verification status</li></ul>
               <p class="tiny-label">Agent cannot see</p>
               <ul class="locked-list"><li>Document contents</li><li>PII values &amp; secrets</li><li>Artifact bytes</li></ul>
               <blockquote class="pitch">“The agent knows the counts.<br /><em>It never knows the values.</em>”</blockquote>
