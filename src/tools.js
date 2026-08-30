@@ -268,6 +268,7 @@ export async function redactField(context, { field, maskMode = "blackout" } = {}
     status: "success",
     field,
     valuesRedacted: ranges.length,
+    redactedIds: ids,
     totalRedacted: context.registry.active().length,
     maskMode,
     findings: context.registry.projectAll(),

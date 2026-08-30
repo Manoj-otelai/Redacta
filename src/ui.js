@@ -895,6 +895,10 @@ async function runAgentDemo() {
         state.lastRedactionBatch = args.targetIds;
         render();
       }
+      if (step.key === "redactField" && success) {
+        state.lastRedactionBatch = result.redactedIds;
+        render();
+      }
       if (!success) {
         toast(result.status === "denied" ? "Agent request denied — the run stopped." : "The agent run stopped — nothing was exported.");
         break;
@@ -1009,6 +1013,7 @@ async function redactStructuredField(field) {
     toast(result.message || "Field redaction failed.");
     return;
   }
+  state.lastRedactionBatch = result.redactedIds;
   render();
   toast("Field redacted locally.");
 }

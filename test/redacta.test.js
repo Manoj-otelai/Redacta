@@ -457,6 +457,33 @@ test("redacting a scanned JSON field creates no duplicate records", async () => 
   assert.equal(artifactText.includes("b@example.test"), false);
 });
 
+test("redactField reports its batch and restores only that batch", async () => {
+  const json = '{"records":[{"ssn":"123-45-6789","email":"a@example.test"},{"ssn":"987-65-4321","email":"b@example.test"}]}';
+  const document = await loadTextDocument({ name: "records.json", type: "application/json", text: async () => json });
+  const registry = createFindingRegistry();
+  const state = { artifact: null, verification: null, revision: 0, maskMode: "blackout", customPatterns: [] };
+  const context = { document, registry, state, callSource: "user", onFindingsChanged() {}, onVerificationChanged() {}, onStateChanged() {} };
+  await scanDocumentPII(context);
+  const ssnIds = registry.all().filter((finding) => finding.type === "ssn").map((finding) => finding.id);
+  registry.markRedacted(ssnIds);
+  const result = await redactField(context, { field: "records[].email" });
+  const emailIds = registry.all().filter((finding) => finding.type === "email").map((finding) => finding.id);
+  assert.deepEqual(result.redactedIds, emailIds);
+  assert.deepEqual(
+    registry.all().filter((finding) => finding.status === "redacted").map((finding) => finding.id).sort(),
+    [...ssnIds, ...emailIds].sort(),
+  );
+  registry.restore(result.redactedIds);
+  assert.deepEqual(
+    registry.all().filter((finding) => finding.status === "redacted").map((finding) => finding.id).sort(),
+    ssnIds.sort(),
+  );
+  assert.deepEqual(
+    registry.all().filter((finding) => finding.status === "pending").map((finding) => finding.id).sort(),
+    emailIds.sort(),
+  );
+});
+
 test("redacting a CSV column masks every data cell without changing other columns", async () => {
   const csv = "employee_id,ssn,note\nEMP-1,123-45-6789,alpha\nEMP-2,987-65-4321,beta\n";
   const document = await loadTextDocument({ name: "records.csv", type: "text/csv", text: async () => csv });
