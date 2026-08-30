@@ -56,6 +56,9 @@ const TYPE_LABELS = {
   manual_rectangle: "Manual region",
   manual: "Manual selection",
 };
+const findingTypeLabel = (type) => type.startsWith("custom:")
+  ? `Custom · ${type.slice(7)}`
+  : (TYPE_LABELS[type] ?? type.replaceAll("_", " "));
 let pdfPreviewCache = { key: null, pdf: null };
 let pdfRenderGeneration = 0;
 let thumbGeneration = 0;
@@ -533,7 +536,7 @@ function render() {
       row.className = `finding${finding.status === "redacted" ? " redacted" : ""}${finding.status === "excluded" ? " excluded" : ""}`;
       row.dataset.findingId = finding.id;
       row.dataset.page = finding.page || 1;
-      row.innerHTML = `<input type="checkbox" data-id="${finding.id}" aria-label="Include ${finding.id} in the next redaction" ${finding.status === "redacted" ? "disabled" : ""} ${finding.status === "excluded" ? "" : "checked"} /><span class="finding-dot"></span><span class="finding-info"><strong>${escapeHtml(TYPE_LABELS[finding.type] ?? finding.type.replaceAll("_", " "))}</strong><small>${finding.id} · ${escapeHtml(finding.location || "local")}</small></span><span class="confidence">${finding.confidence.toFixed(2)}</span><span class="finding-actions">${finding.status === "pending" ? "" : `<span class="finding-tag">${finding.status}</span>`}${finding.status === "redacted" ? `<button class="finding-control" data-action="restore" data-id="${finding.id}">Restore</button>` : ""}</span>`;
+      row.innerHTML = `<input type="checkbox" data-id="${finding.id}" aria-label="Include ${finding.id} in the next redaction" ${finding.status === "redacted" ? "disabled" : ""} ${finding.status === "excluded" ? "" : "checked"} /><span class="finding-dot"></span><span class="finding-info"><strong>${escapeHtml(findingTypeLabel(finding.type))}</strong><small>${finding.id} · ${escapeHtml(finding.location || "local")}</small></span><span class="confidence">${finding.confidence.toFixed(2)}</span><span class="finding-actions">${finding.status === "pending" ? "" : `<span class="finding-tag">${finding.status}</span>`}${finding.status === "redacted" ? `<button class="finding-control" data-action="restore" data-id="${finding.id}">Restore</button>` : ""}</span>`;
       list.append(row);
     }
   }
@@ -565,7 +568,7 @@ function renderCategorySummary(findings) {
   summary.replaceChildren(...[...counts].map(([type, count]) => {
     const chip = document.createElement("span");
     chip.className = "category-chip";
-    chip.append(TYPE_LABELS[type] ?? type.replaceAll("_", " "), Object.assign(document.createElement("strong"), { textContent: String(count) }));
+    chip.append(findingTypeLabel(type), Object.assign(document.createElement("strong"), { textContent: String(count) }));
     return chip;
   }));
 }
