@@ -354,20 +354,87 @@ function renderTextPreview() {
   return parts.join("");
 }
 
+function updateManualTextPreviewFocusable(preview) {
+  if (state.manualMode && state.document?.kind !== "pdf") preview.setAttribute("tabindex", "0");
+  else preview.removeAttribute("tabindex");
+}
+
+function commitManualTextSelection(preview) {
+  if (!state.manualMode) return;
+  const selection = window.getSelection();
+  if (!selection || selection.isCollapsed || !preview.contains(selection.anchorNode) || !preview.contains(selection.focusNode)) return;
+  const start = selectionPointToOffset(preview, selection.anchorNode, selection.anchorOffset);
+  const end = selectionPointToOffset(preview, selection.focusNode, selection.focusOffset);
+  const first = Math.min(start, end);
+  const last = Math.max(start, end);
+  if (last <= first) return;
+  registry.addManual({ page: 1, location: "manual text selection", charStart: first, charEnd: last, value: state.document.text.slice(first, last) });
+  selection.removeAllRanges();
+  state.manualMode = false;
+  invalidate();
+}
+
+function placeManualTextCaret(preview) {
+  const selection = window.getSelection();
+  if (!selection || selection.rangeCount && preview.contains(selection.anchorNode)) return;
+  const point = manualTextPointAtOffset(preview, 0);
+  if (!point) return;
+  const range = document.createRange();
+  range.setStart(...point);
+  range.collapse(true);
+  selection.removeAllRanges();
+  selection.addRange(range);
+}
+
+function manualTextPointAtOffset(preview, offset) {
+  const walker = document.createTreeWalker(preview, NodeFilter.SHOW_TEXT);
+  let node;
+  let lastPoint = null;
+  while ((node = walker.nextNode())) {
+    const owner = node.parentElement?.closest("[data-start]");
+    if (!owner || !preview.contains(owner)) continue;
+    const start = Number(owner.dataset.start);
+    const end = Number(owner.dataset.end);
+    const localEnd = Math.min(node.length, end - start);
+    lastPoint = [node, localEnd];
+    if (offset <= start) return [node, 0];
+    if (offset <= end) return [node, Math.max(0, Math.min(localEnd, offset - start))];
+  }
+  return lastPoint;
+}
+
+function extendManualTextSelection(preview, direction) {
+  const selection = window.getSelection();
+  if (!selection || !selection.rangeCount || !preview.contains(selection.anchorNode) || !preview.contains(selection.focusNode)) return;
+  const anchor = selectionPointToOffset(preview, selection.anchorNode, selection.anchorOffset);
+  const focus = selectionPointToOffset(preview, selection.focusNode, selection.focusOffset);
+  const nextFocus = Math.max(0, Math.min(state.document.text.length, focus + direction));
+  const anchorPoint = manualTextPointAtOffset(preview, anchor);
+  const focusPoint = manualTextPointAtOffset(preview, nextFocus);
+  if (!anchorPoint || !focusPoint) return;
+  selection.setBaseAndExtent(anchorPoint[0], anchorPoint[1], focusPoint[0], focusPoint[1]);
+}
+
 function attachManualTextSelection(preview) {
-  preview.onmouseup = () => {
-    if (!state.manualMode) return;
-    const selection = window.getSelection();
-    if (!selection || selection.isCollapsed || !preview.contains(selection.anchorNode) || !preview.contains(selection.focusNode)) return;
-    const start = selectionPointToOffset(preview, selection.anchorNode, selection.anchorOffset);
-    const end = selectionPointToOffset(preview, selection.focusNode, selection.focusOffset);
-    const first = Math.min(start, end);
-    const last = Math.max(start, end);
-    if (last <= first) return;
-    registry.addManual({ page: 1, location: "manual text selection", charStart: first, charEnd: last, value: state.document.text.slice(first, last) });
-    selection.removeAllRanges();
-    state.manualMode = false;
-    invalidate();
+  updateManualTextPreviewFocusable(preview);
+  preview.onfocus = () => {
+    if (state.manualMode) placeManualTextCaret(preview);
+  };
+  preview.onmouseup = () => commitManualTextSelection(preview);
+  preview.onkeydown = (event) => {
+    if (event.shiftKey && event.key === "ArrowRight") {
+      event.preventDefault();
+      extendManualTextSelection(preview, 1);
+      return;
+    }
+    if (event.shiftKey && event.key === "ArrowLeft") {
+      event.preventDefault();
+      extendManualTextSelection(preview, -1);
+      return;
+    }
+    if (event.key !== "Enter") return;
+    event.preventDefault();
+    commitManualTextSelection(preview);
   };
 }
 
@@ -801,6 +868,8 @@ function downloadCertificate() {
 function setManualMode(enabled) {
   state.manualMode = enabled;
   renderViewerChrome();
+  const preview = $("documentPreview").firstElementChild;
+  if (preview?.classList.contains("text-page")) updateManualTextPreviewFocusable(preview);
 }
 
 function goToPage(pageNumber) {
@@ -1128,7 +1197,11 @@ export function initUI() {
   });
   $("manualButton").addEventListener("click", () => {
     setManualMode(!state.manualMode);
-    toast(state.manualMode ? "Drag over the page, or select text, to mark a region." : "Manual marking cancelled.");
+    toast(state.manualMode
+      ? state.document?.kind === "pdf"
+        ? "Drag over the page to mark a region."
+        : "Drag over the page, or select text and press Enter, to mark a region."
+      : "Manual marking cancelled.");
   });
   $("undoButton").addEventListener("click", () => { registry.restore(state.lastRedactionBatch); state.lastRedactionBatch = []; invalidate(); toast("Last redaction batch undone."); });
   $("findingList").addEventListener("change", (event) => {
@@ -1194,7 +1267,7 @@ export function initUI() {
       if (state.manualMode) setManualMode(false);
       return;
     }
-    if (event.target.matches("input, textarea, select") || event.ctrlKey || event.metaKey || event.altKey) return;
+    if (event.target.matches("input, textarea, select") || event.ctrlKey || event.metaKey || event.altKey || event.shiftKey) return;
     if (event.key === "ArrowLeft" || event.key === "PageUp") goToPage(state.pdfPage - 1);
     else if (event.key === "ArrowRight" || event.key === "PageDown") goToPage(state.pdfPage + 1);
     else if (event.key === "+" || event.key === "=") stepZoom(1);

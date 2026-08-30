@@ -77,6 +77,7 @@ Synthetic replacement keeps the document readable with plausible local placehold
 - **Worker scanning:** detector work runs in a module worker and reports progress by detector category.
 - **Layered detectors:** regex candidates are followed by structural validation (Luhn, SSN ranges, key/token/connection shapes) and confidence scoring.
 - **Rasterized PDF export:** every source page is rendered to a canvas, padded whole-item masks are baked into PNGs, and a new image-only PDF is built. This removes the text layer and avoids under-redaction from interpolated character geometry.
+- **Manual marking accessibility:** manual region marking on PDFs currently requires a pointer, while text documents support keyboard selection and Enter to commit.
 - **Artifact-byte verification:** verification re-reads the generated Blob, extracts text from PDFs, decodes text artifacts, and rescans the resulting bytes. App state is never treated as proof.
 - **Mask-coverage verification:** a rasterized PDF has no text layer, so a text rescan alone would pass while a skipped finding is still legible in the page image. Verification therefore reports three checks separately (`extractableFindings`, `unmaskedRegions`, `originalValuesFound`), and any of them failing blocks export.
 - **Explicit privacy projection:** the finding registry stores raw values privately and exposes only a fixed safe-field whitelist to tools, UI activity, and errors.
