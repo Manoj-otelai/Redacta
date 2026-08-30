@@ -707,7 +707,7 @@ button, input, select, textarea { font: inherit; }
   .brand-name { display: none; }
   .menu-item { padding: 5px 6px; font-size: 12px; }
   .app-bar-right { gap: 6px; }
-  .native-status, .local-pill { display: none; }
+  .native-status { display: none; }
   .bar-action { padding: 6px 8px; }
   .app-body { grid-template-columns: 56px minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) minmax(0, 42vh); }
   .viewer { grid-column: 2; }
@@ -717,14 +717,37 @@ button, input, select, textarea { font: inherit; }
   .icon-button-text { display: none; }
 }
 @media (max-width: 480px) {
+  .app-bar {
+    gap: 4px;
+    padding: 0 6px;
+  }
+  .brand { display: none; }
+  .menu-bar { gap: 1px; }
+  .menu-item {
+    padding: 5px 2px;
+    font-size: 11px;
+  }
+  .app-bar-right { gap: 4px; }
+  .bar-action { padding: 6px 4px; }
+  .local-pill { padding: 3px 6px; }
   #runAgentDemoText { display: none; }
-  .viewer-toolbar { flex-wrap: wrap; }
-  #processingBadge, #zoomFit, #manualButton, .toolbar-spacer { display: none; }
+  .viewer-toolbar {
+    flex-wrap: wrap;
+    gap: 2px;
+    padding: 3px 4px;
+  }
+  .icon-button {
+    min-height: 24px;
+    gap: 3px;
+    padding: 3px 4px;
+  }
+  .icon-button svg { width: 16px; height: 16px; }
+  .toolbar-spacer { display: none; }
   .status-bar {
-    gap: 8px;
-    padding: 0 8px;
-    font-size: 10px;
+    gap: 4px;
+    padding: 0 6px;
+    font-size: 8px;
     white-space: nowrap;
   }
-  .status-bar > .status-cell:nth-of-type(n + 4), .status-spacer { display: none; }
+  .status-bar > .status-cell:nth-of-type(n + 5), .status-spacer { display: none; }
 }
