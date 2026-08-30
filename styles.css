@@ -721,11 +721,20 @@ button, input, select, textarea { font: inherit; }
     gap: 4px;
     padding: 0 6px;
   }
-  .brand { display: none; }
+  .brand {
+    display: flex;
+    flex: 0 0 20px;
+    gap: 0;
+  }
+  .brand-icon {
+    flex-basis: 20px;
+    width: 20px;
+    height: 20px;
+  }
   .menu-bar { gap: 1px; }
   .menu-item {
-    padding: 5px 2px;
-    font-size: 11px;
+    padding: 5px 1px;
+    font-size: 10px;
   }
   .app-bar-right { gap: 4px; }
   .bar-action { padding: 6px 4px; }
@@ -746,8 +755,9 @@ button, input, select, textarea { font: inherit; }
   .status-bar {
     gap: 4px;
     padding: 0 6px;
-    font-size: 8px;
+    font-size: 10px;
     white-space: nowrap;
   }
+  .status-bar > .status-cell:first-of-type { display: none; }
   .status-bar > .status-cell:nth-of-type(n + 5), .status-spacer { display: none; }
 }
