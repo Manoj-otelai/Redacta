@@ -42,7 +42,7 @@ rendering of <a href="./index.html">redacta/index.html</a> — same content, no 
 <span class="m-section-label">Runtime:</span>
   supported input: pdf, txt, json, csv
   processing: in-page, no backend, no upload endpoint
-  webmcp: document.modelContext, Demo Mode fallback</pre></div>
+  webmcp: document.modelContext or navigator.modelContext, Demo Mode fallback</pre></div>
     <button class="copy" type="button" title="Copy this block">copy</button>
   </section>
 
@@ -135,7 +135,7 @@ result: extractable: 0 · unmasked regions: 0 · original values: 0 · export un
   <section class="blk" id="tools">
     <div class="blk-body"><pre><span class="m-heading m-h2"><span class="m-hash">##</span> WebMCP surface — ten tools, capabilities not contents</span>
 
-Registered on document.modelContext when native WebMCP is available, with a
+Registered on document.modelContext or navigator.modelContext when native WebMCP is available, with a
 Demo Mode console when it isn't — the same tools, the same boundary.
 
 <span class="m-signature">inspectDocument({})</span>

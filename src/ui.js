@@ -1139,7 +1139,12 @@ async function redactStructuredField(field) {
 
 function registerTools() {
   const execute = (name, input) => executeTool(name, input, "agent");
-  if (!document.modelContext?.registerTool) {
+  const modelContext = document.modelContext?.registerTool
+    ? document.modelContext
+    : navigator.modelContext?.registerTool
+      ? navigator.modelContext
+      : null;
+  if (!modelContext) {
     $("nativeStatusText").textContent = "Demo Mode";
     $("nativeStatus").classList.add("is-demo");
     $("nativeStatus").title = "Native WebMCP isn't available. Demo Mode is active — the same tools are callable from the tool console.";
@@ -1148,7 +1153,7 @@ function registerTools() {
     Object.assign(window, Object.fromEntries(Object.keys(toolMap).map((name) => [name, (input) => execute(name, input)])));
     return;
   }
-  for (const [name] of Object.entries(toolMap)) document.modelContext.registerTool({ name, description: TOOL_DESCRIPTIONS[name], inputSchema: TOOL_SCHEMAS[name], execute: (input) => execute(name, input) });
+  for (const [name] of Object.entries(toolMap)) modelContext.registerTool({ name, description: TOOL_DESCRIPTIONS[name], inputSchema: TOOL_SCHEMAS[name], execute: (input) => execute(name, input) });
   $("modeLabel").textContent = "NATIVE WEBMCP";
   $("nativeStatusText").textContent = `${Object.keys(toolMap).length} WebMCP tools registered`;
   $("statusMode").textContent = "native";

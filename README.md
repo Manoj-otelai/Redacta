@@ -46,7 +46,7 @@ npm test
 
 ## WebMCP tools
 
-All ten tools are registered on `document.modelContext` when native WebMCP is available, and are exposed in Demo Mode otherwise. Every description promises that contents and sensitive values are never returned.
+All ten tools are registered on `document.modelContext` or `navigator.modelContext` when native WebMCP is available, and are exposed in Demo Mode otherwise. Every description promises that contents and sensitive values are never returned.
 
 - `inspectDocument({})` — local metadata; returns `fileType`, `filename`, human-readable `documentSize`, `pageCount`, and `processingStatus`.
 - `scanDocumentPII({categories?: ["ssn", "credit_card", "email", "phone", "api_key", "private_key", "bearer_token", "db_connection_string"]})` — privacy-safe findings.
